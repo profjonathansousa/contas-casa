@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Nossas Contas</title>
+<meta name="description" content="Contas da casa, compartilhadas.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d4f3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Contas">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+<link rel="icon" href="icones/icone-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ---------- entrar ---------- -->
+<section id="tela-login" class="tela" hidden>
+  <form id="form-login" class="cartao-login">
+    <h1>Nossas Contas</h1>
+    <label for="in-email">E-mail</label>
+    <input id="in-email" type="email" inputmode="email" autocomplete="username"
+           autocapitalize="off" autocorrect="off" required>
+    <label for="in-senha">Senha</label>
+    <input id="in-senha" type="password" autocomplete="current-password" required>
+    <button id="btn-entrar" type="submit">Entrar</button>
+    <p id="erro-login" class="erro" hidden></p>
+  </form>
+</section>
+
+<!-- ---------- o mês ---------- -->
+<main id="tela-mes" class="tela" hidden>
+  <header class="topo">
+    <div class="linha-mes">
+      <button id="mes-ant" class="seta" aria-label="Mês anterior">&lsaquo;</button>
+      <button id="mes-nome" class="nome-mes" aria-label="Voltar ao mês atual">&nbsp;</button>
+      <button id="mes-prox" class="seta" aria-label="Próximo mês">&rsaquo;</button>
+    </div>
+    <div class="totais">
+      <div class="total"><span>previsto</span><b id="t-previsto">—</b></div>
+      <div class="total pg"><span>pago</span><b id="t-pago">—</b></div>
+      <div class="total ap"><span>a pagar</span><b id="t-apagar">—</b></div>
+    </div>
+    <button id="t-aberto" class="aberto" hidden></button>
+  </header>
+
+  <div id="lista" class="lista"></div>
+  <footer class="rodape">
+    <button id="btn-sair" class="sair">sair</button>
+  </footer>
+
+  <button id="btn-add" class="fab" aria-label="Adicionar conta">+</button>
+</main>
+
+<!-- ---------- adicionar conta avulsa ---------- -->
+<div id="fundo-add" class="fundo" hidden></div>
+<form id="folha-add" class="folha" hidden>
+  <h2>Nova conta</h2>
+  <label for="ad-desc">Descrição</label>
+  <input id="ad-desc" type="text" enterkeyhint="next" autocapitalize="sentences" required>
+  <div class="dupla">
+    <div>
+      <label for="ad-dia">Vence dia</label>
+      <input id="ad-dia" type="number" inputmode="numeric" min="1" max="31" required>
+    </div>
+    <div>
+      <label for="ad-valor">Valor <small>(pode deixar vazio)</small></label>
+      <input id="ad-valor" type="text" inputmode="decimal" placeholder="???">
+    </div>
+  </div>
+  <div class="botoes">
+    <button type="button" id="ad-cancelar" class="secundario">Cancelar</button>
+    <button type="submit" id="ad-salvar">Adicionar</button>
+  </div>
+  <p id="erro-add" class="erro" hidden></p>
+</form>
+
+<div id="aviso" class="aviso" hidden></div>
+
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

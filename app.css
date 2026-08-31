@@ -1,0 +1,190 @@
+/* Nossas Contas — o alvo é ler no carro e marcar com o polegar de uma mão. */
+
+:root {
+  --verde:      #0d4f3d;
+  --verde-alto: #10603a;
+  --fundo:      #f4f5f2;
+  --papel:      #ffffff;
+  --texto:      #16211c;
+  --fraco:      #6b7770;
+  --borda:      #e2e6e1;
+  --pago:       #157a4a;
+  --pago-fundo: #e8f5ec;
+  --alerta:     #a3341f;
+  --raio:       14px;
+  --topo-h:     0px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo:      #11150f;
+    --papel:      #1a1f1b;
+    --texto:      #eef2ec;
+    --fraco:      #93a099;
+    --borda:      #2b332d;
+    --pago-fundo: #14301f;
+    --pago:       #5fd196;
+    --alerta:     #ff8a70;
+  }
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: var(--fundo); color: var(--texto);
+  font: 400 17px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior-y: none;
+}
+
+button, input { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+.tela[hidden], [hidden] { display: none !important; }
+
+/* ---------- entrar ---------- */
+.cartao-login {
+  max-width: 420px; margin: 0 auto; padding: 40px 22px calc(24px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 6px; min-height: 100dvh; justify-content: center;
+}
+.cartao-login h1 { font-size: 30px; margin: 0 0 22px; letter-spacing: -.02em; }
+.cartao-login label { font-size: 14px; color: var(--fraco); margin-top: 12px; }
+.cartao-login input {
+  padding: 15px 14px; border: 1px solid var(--borda); border-radius: var(--raio);
+  background: var(--papel); font-size: 17px;
+}
+.cartao-login input:focus { outline: 2px solid var(--verde); outline-offset: 1px; }
+#btn-entrar {
+  margin-top: 22px; padding: 17px; border-radius: var(--raio);
+  background: var(--verde); color: #fff; font-size: 18px; font-weight: 600;
+}
+#btn-entrar:disabled { opacity: .55; }
+.erro { color: var(--alerta); font-size: 15px; margin: 12px 0 0; }
+
+/* ---------- cabeçalho fixo ---------- */
+.topo {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--verde); color: #fff;
+  padding: calc(6px + env(safe-area-inset-top)) 12px 10px;
+  border-radius: 0 0 18px 18px;
+}
+.linha-mes { display: flex; align-items: center; justify-content: space-between; }
+.seta {
+  width: 52px; height: 46px; font-size: 30px; line-height: 1; color: #fff; opacity: .8;
+}
+.seta:active { opacity: .4; }
+.nome-mes {
+  flex: 1; color: #fff; font-size: 20px; font-weight: 600; letter-spacing: -.01em;
+  padding: 8px 0;
+}
+.totais { display: flex; gap: 8px; margin-top: 4px; }
+.total {
+  flex: 1; background: rgba(255,255,255,.12); border-radius: 12px;
+  padding: 8px 4px 9px; text-align: center; min-width: 0;
+}
+.total span {
+  display: block; font-size: 11.5px; text-transform: uppercase;
+  letter-spacing: .07em; opacity: .78; margin-bottom: 1px;
+}
+.total b {
+  display: block; font-size: 18px; font-weight: 700; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.total.pg b { color: #9ff0bf; }
+.total.ap b { color: #ffe08a; }
+.aberto {
+  display: block; width: 100%; margin-top: 8px; padding: 7px;
+  background: rgba(255,255,255,.14); border-radius: 10px;
+  color: #ffe08a; font-size: 14.5px; font-weight: 600; text-align: center;
+}
+
+/* o "R$" fica menor e discreto: quem lê no carro procura o número */
+.total b i, .valor i {
+  font-style: normal; font-size: .68em; font-weight: 600; opacity: .62;
+  margin-right: 1px; letter-spacing: 0;
+}
+
+/* ---------- lista ---------- */
+.lista { padding: 6px 10px 8px; }
+.rodape { padding: 18px 10px calc(110px + env(safe-area-inset-bottom)); text-align: center; }
+.dia {
+  font-size: 13px; font-weight: 700; color: var(--fraco);
+  text-transform: uppercase; letter-spacing: .08em;
+  padding: 16px 6px 6px;
+}
+.item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--papel); border: 1px solid var(--borda);
+  border-radius: var(--raio); margin-bottom: 8px;
+  min-height: 66px; padding: 10px 12px; transition: background .12s, border-color .12s;
+}
+.item:active { background: var(--borda); }
+.item.pago { background: var(--pago-fundo); border-color: transparent; }
+.marca {
+  flex: none; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--borda); display: grid; place-items: center;
+  color: #fff; font-size: 15px; font-weight: 700;
+}
+.item.pago .marca { background: var(--pago); border-color: var(--pago); }
+.corpo { flex: 1; min-width: 0; }
+.desc {
+  font-size: 19px; font-weight: 500; letter-spacing: -.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.item.pago .desc { color: var(--fraco); }
+.selo { font-size: 13px; color: var(--pago); margin-top: 2px; }
+.valor {
+  flex: none; padding: 10px 4px 10px 12px; font-size: 19px; font-weight: 700;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums; text-align: right;
+}
+.valor.vazio { color: var(--alerta); font-weight: 600; }
+.item.pago .valor { color: var(--fraco); }
+.editando {
+  width: 116px; text-align: right; padding: 9px 8px; font-size: 19px; font-weight: 700;
+  border: 2px solid var(--verde); border-radius: 10px; background: var(--papel);
+  font-variant-numeric: tabular-nums;
+}
+.vazio-mes { text-align: center; color: var(--fraco); padding: 56px 20px; font-size: 17px; }
+
+/* ---------- botões flutuantes ---------- */
+.fab {
+  position: fixed; right: 18px; bottom: calc(20px + env(safe-area-inset-bottom));
+  width: 62px; height: 62px; border-radius: 50%; z-index: 30;
+  background: var(--verde); color: #fff; font-size: 34px; line-height: 1;
+  box-shadow: 0 6px 18px rgba(0,0,0,.22);
+}
+.fab:active { transform: scale(.94); }
+.sair { color: var(--fraco); font-size: 15px; padding: 12px 24px; }
+
+/* ---------- folha de adicionar ---------- */
+.fundo { position: fixed; inset: 0; background: rgba(0,0,0,.42); z-index: 40; }
+.folha {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+  background: var(--papel); border-radius: 20px 20px 0 0;
+  padding: 18px 18px calc(20px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 4px;
+  box-shadow: 0 -8px 30px rgba(0,0,0,.2);
+}
+.folha h2 { margin: 0 0 10px; font-size: 21px; }
+.folha label { font-size: 13.5px; color: var(--fraco); margin-top: 10px; }
+.folha label small { font-weight: 400; }
+.folha input {
+  width: 100%; padding: 14px 12px; border: 1px solid var(--borda);
+  border-radius: 12px; background: var(--fundo); font-size: 17px;
+}
+.folha input:focus { outline: 2px solid var(--verde); outline-offset: 1px; }
+.dupla { display: flex; gap: 12px; }
+.dupla > div { flex: 1; min-width: 0; }
+.botoes { display: flex; gap: 10px; margin-top: 18px; }
+.botoes button {
+  flex: 1; padding: 16px; border-radius: 12px; font-size: 17px; font-weight: 600;
+  background: var(--verde); color: #fff;
+}
+.botoes .secundario { background: var(--borda); color: var(--texto); }
+
+/* ---------- aviso ---------- */
+.aviso {
+  position: fixed; left: 12px; right: 12px; bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 60; background: var(--alerta); color: #fff;
+  padding: 13px 16px; border-radius: 12px; font-size: 15.5px; text-align: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,.2);
+}

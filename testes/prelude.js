@@ -1,0 +1,137 @@
+/* Bancada: DOM e Supabase falsos. Nada da logica do app e reimplementado --
+   o app.js real roda em cima disto. */
+var LOG = { selects: [], updates: [], inserts: [], canais: [] };
+
+function Elem(tag) {
+  this.tag = tag; this.filhos = []; this.hs = {}; this._txt = ''; this._html = '';
+  this.className = ''; this.hidden = false; this.value = ''; this.disabled = false;
+  this.style = {};
+}
+Elem.prototype.appendChild = function (c) { this.filhos.push(c); return c; };
+Elem.prototype.addEventListener = function (n, f) { (this.hs[n] = this.hs[n] || []).push(f); };
+Elem.prototype.setAttribute = function () {};
+Elem.prototype.focus = function () {}; Elem.prototype.select = function () {};
+Elem.prototype.replaceWith = function (novo) {
+  var p = this.pai; if (!p) return;
+  for (var i = 0; i < p.filhos.length; i++) if (p.filhos[i] === this) { p.filhos[i] = novo; novo.pai = p; }
+};
+Elem.prototype.disparar = function (n, ev) {
+  var hs = this.hs[n] || []; ev = ev || { preventDefault: function(){}, stopPropagation: function(){} };
+  for (var i = 0; i < hs.length; i++) hs[i](ev);
+};
+Object.defineProperty(Elem.prototype, 'textContent', {
+  get: function () { return this._txt; },
+  set: function (v) { this._txt = String(v); this.filhos = []; }
+});
+Object.defineProperty(Elem.prototype, 'innerHTML', {
+  get: function () { return this._html; },
+  set: function (v) { this._html = String(v); }
+});
+
+var registro = {};
+var document = {
+  querySelector: function (s) { return registro[s] || (registro[s] = new Elem('div')); },
+  createElement: function (t) { return new Elem(t); },
+  addEventListener: function () {}, hidden: false
+};
+// appendChild precisa marcar o pai (para replaceWith funcionar)
+var _ap = Elem.prototype.appendChild;
+Elem.prototype.appendChild = function (c) { c.pai = this; return _ap.call(this, c); };
+
+var window = { addEventListener: function () {}, CONFIG: { URL: 'http://x', ANON: 'k' } };
+var navigator = {};
+var localStorage = (function () {
+  var m = {};
+  return { getItem: function (k) { return k in m ? m[k] : null; },
+           setItem: function (k, v) { m[k] = String(v); },
+           removeItem: function (k) { delete m[k]; } };
+})();
+function setTimeout(f) { return 0; } function clearTimeout() {}
+
+/* ----- dados fixos da bancada (ficticios) ----- */
+var MES = (function () { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01'; })();
+var ID_EU = 'aaaaaaaa-0000-0000-0000-000000000001';
+var ID_OUTRO = 'bbbbbbbb-0000-0000-0000-000000000002';
+var CASA = 'cccccccc-0000-0000-0000-000000000003';
+function lanc(id, desc, dia, valor, pago) {
+  return { id: id, competencia: MES, descricao: desc, dia_vencimento: dia,
+           vencimento: MES.slice(0,8) + String(dia).padStart(2,'0'),
+           valor_previsto: valor, valor_pago: null, pago: !!pago,
+           pago_em: pago ? '2026-08-31T14:32:00.000Z' : null,
+           pago_por: pago ? ID_OUTRO : null };
+}
+var BANCO = [
+  lanc('l1', 'Aluguel', 5, 1800.00, false),
+  lanc('l2', 'Luz', 8, null, false),
+  lanc('l3', 'Agua', 8, 95.40, false),
+  lanc('l4', 'Internet', 10, 129.90, true),
+  lanc('l5', 'Cartao azul', 15, null, false)
+];
+
+function thenable(valor) {
+  var o = {
+    eq: function (col, v) { o._eq = o._eq || {}; o._eq[col] = v; return o; },
+    order: function () { return o; },
+    select: function () { return o; },
+    single: function () { o._single = true; return o; },
+    then: function (res) { return Promise.resolve(valor()).then(res); }
+  };
+  return o;
+}
+
+var supabase = {
+  createClient: function () {
+    return {
+      auth: {
+        getSession: function () { return Promise.resolve({ data: { session: { u: 1 } } }); },
+        getUser: function () { return Promise.resolve({ data: { user: { id: ID_EU } } }); },
+        signInWithPassword: function () { return Promise.resolve({ error: null }); },
+        signOut: function () { return Promise.resolve({}); }
+      },
+      channel: function (nome) {
+        var c = { nome: nome, on: function (t, cfg, fn) { c.cfg = cfg; c.fn = fn; return c; },
+                  subscribe: function () { LOG.canais.push(c); return c; } };
+        return c;
+      },
+      removeChannel: function () {},
+      from: function (tabela) {
+        return {
+          select: function (cols) {
+            var t = thenable(function () {
+              if (tabela === 'perfil') {
+                return { data: [ { id: ID_EU, casa_id: CASA, nome: 'Jonathan' },
+                                 { id: ID_OUTRO, casa_id: CASA, nome: 'Diva' } ], error: null };
+              }
+              LOG.selects.push({ tabela: tabela, comp: t._eq && t._eq.competencia });
+              return { data: BANCO.map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }), error: null };
+            });
+            return t;
+          },
+          update: function (obj) {
+            var reg = { tabela: tabela, campos: Object.keys(obj), valores: obj };
+            LOG.updates.push(reg);
+            var t = thenable(function () {
+              reg.id = t._eq && t._eq.id;
+              var base = BANCO.filter(function (x) { return x.id === reg.id; })[0] || BANCO[0];
+              var d = {}; for (var k in base) d[k] = base[k];
+              for (var k2 in obj) d[k2] = obj[k2];
+              if (obj.pago === true) { d.pago_em = new Date().toISOString(); d.pago_por = ID_EU; }
+              if (obj.pago === false) { d.pago_em = null; d.pago_por = null; }
+              return { data: d, error: null };
+            });
+            return t;
+          },
+          insert: function (obj) {
+            LOG.inserts.push(obj);
+            return thenable(function () {
+              var d = {}; for (var k in obj) d[k] = obj[k];
+              d.id = 'novo'; d.vencimento = MES.slice(0,8) + String(obj.dia_vencimento).padStart(2,'0');
+              d.pago = false; d.pago_em = null; d.pago_por = null; d.valor_pago = null;
+              return { data: d, error: null };
+            });
+          }
+        };
+      }
+    };
+  }
+};

@@ -1,6 +1,6 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 31/08/2026 — fim do bloco 1 (fundação). BANCO DE PÉ.
+Atualizado em 31/08/2026 — fim do bloco 2 (interface escrita e testada).
 
 ## O que foi feito
 
@@ -64,22 +64,59 @@ Cada número acima pôde voltar diferente — o controle negativo é o par de
 medições 1 e 2 da prova de RLS, e o teste de casa vizinha (criada e revertida
 por rollback, não ficou no banco).
 
+## Interface: escrita em 31/08/2026
+
+Arquivos: `index.html`, `app.css`, `app.js`, `config.js`, `sw.js`,
+`manifest.webmanifest`, `icones/` (4 PNGs gerados), `vendor/supabase.js`.
+
+Única dependência de terceiros: **@supabase/supabase-js 2.112.4**, build UMD,
+versionada dentro do repositório em `vendor/` em vez de vir de CDN — assim o
+app não depende de outro servidor no ar e o service worker consegue cachear.
+
+Decisões tomadas no caminho:
+- O cliente nunca escreve `vencimento`, `pago_em`, `pago_por`. Marcar pago
+  manda **um campo só** (`pago`), o resto é trigger. Medido.
+- Toque no valor edita; toque em qualquer outro ponto marca. Sem confirmação.
+- Cache de pintura em `localStorage` (só leitura) para a tela aparecer antes da
+  rede responder. Não é a fila offline da fase 2 — não guarda escrita nenhuma.
+- Realtime cacheado por casa, com filtro `casa_id=eq.<id>` no servidor.
+
+## Provas rodadas
+
+`./testes/rodar.sh` — roda o `app.js` e o `sw.js` reais no `jsc` com o mundo
+em volta falsificado. Placar: **45 / 4 / 11 medidas, 0 falhas.**
+
+No navegador, servindo em 127.0.0.1:
+| medição | resultado |
+|---|---|
+| login com senha errada, pela tela | "E-mail ou senha não conferem.", não entrou |
+| leitura sem sessão (controle negativo) | `permission denied for table lancamento` |
+| tela do mês, iPhone 375px, claro e escuro | conferida por captura |
+| service worker registrando | **NÃO verificado** — o painel de navegador bloqueia |
+
+## O que ainda NÃO foi provado
+
+1. **Login de verdade.** Não tenho senha de ninguém e a criação de um usuário
+   de teste por SQL foi bloqueada. Jonathan e Diva precisam entrar de fato.
+2. **Instalar na tela de início.** O service worker não registra no painel de
+   navegador usado aqui (`unknown error occurred when fetching the script`),
+   embora `sw.js` responda 200 e o contexto seja seguro. Só o iPhone prova.
+3. **Realtime entre dois aparelhos.** A bancada prova que o app reage ao evento;
+   ela não prova que o evento chega pela rede.
+
 ## Pendências pequenas
 
-- O perfil da esposa está com o nome provisório **"Esposa"**. É esse texto que
-  vai aparecer no selo "pago por ___, 14:32". Trocar com um UPDATE de uma linha
-  assim que Jonathan disser o nome.
 - Os nove lançamentos são o seed fictício. Apagar com
   `delete from public.lancamento where observacao = 'seed';`
+- **Não há como apagar um lançamento pela tela.** "Excluir" não estava na lista
+  dos 12 itens desta fase e eu não ampliei o escopo por conta própria. Uma conta
+  digitada errada só sai pelo SQL. Decisão de Jonathan.
 
 ## PRÓXIMA AÇÃO EXATA
 
-Falta **a anon key** (painel do Supabase, botão **Connect** no topo, ou
-Settings > API Keys). Jonathan precisa colar ela aqui.
+Publicar no GitHub Pages, para dar para testar no iPhone. **Ainda não foi
+feito** — o repositório existe só localmente, nada foi enviado para lugar
+nenhum, e enviar depende de Jonathan autorizar.
 
-Com a anon key em mãos, começar a interface na ordem: `config.js`, login por
-e-mail e senha, tela do mês, toque único, realtime, selo, cabeçalho de totais,
-editar valor, conta avulsa, navegação entre meses, PWA instalável, publicar no
-GitHub Pages.
-
-A URL do projeto já é conhecida: `https://mcwgiqwbbgdltzqgopcq.supabase.co`
+Depois de publicado: os dois entram, marcam uma conta cada um, e conferem se a
+tela do outro muda sozinha e se o selo mostra o nome certo.
