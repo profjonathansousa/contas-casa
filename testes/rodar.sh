@@ -18,4 +18,7 @@ cat "$T/dir.js" "$T/p2.js" "$APP/app.js" "$AQUI/teste_semperfil.js" > "$T/b.js"
 cat "$AQUI/sw_prelude.js" "$APP/sw.js" "$AQUI/sw_testes.js" > "$T/c.js"
 "$JSC" "$T/c.js"
 
+cat "$T/dir.js" "$AQUI/aviso_testes.js" > "$T/d.js"
+"$JSC" "$T/d.js"
+
 rm -rf "$T"

@@ -108,6 +108,13 @@ button { border: 0; background: none; cursor: pointer; }
 .rodape { padding: 18px 10px calc(110px + env(safe-area-inset-bottom)); text-align: center; }
 .dica { color: var(--fraco); font-size: 13.5px; margin: 0 0 6px; }
 .links { display: flex; justify-content: center; gap: 4px; }
+.avisos {
+  display: block; margin: 0 auto 14px; padding: 12px 20px; border-radius: 999px;
+  border: 1px solid var(--borda); background: var(--papel);
+  font-size: 15px; font-weight: 600; color: var(--texto);
+}
+.avisos.ligado { background: var(--pago-fundo); border-color: transparent; color: var(--pago); }
+.avisos.bloqueado { color: var(--fraco); font-weight: 400; }
 .gerar {
   display: block; margin: 12px 10px 2px; width: calc(100% - 20px); padding: 16px 14px;
   background: var(--verde); color: #fff; border-radius: var(--raio);

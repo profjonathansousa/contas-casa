@@ -23,7 +23,7 @@ var el = {
   apDesc: $('#ap-desc'), apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar'),
   adTitulo: $('#ad-titulo'), btnGerar: $('#btn-gerar'), btnFixas: $('#btn-fixas'),
   fixas: $('#tela-fixas'), fxLista: $('#fx-lista'), fxVoltar: $('#fx-voltar'),
-  fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes')
+  fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes'), btnAvisos: $('#btn-avisos')
 };
 
 var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
@@ -562,6 +562,86 @@ function editarPadrao(m, botao) {
   });
 }
 
+/* ---------- avisos no celular ---------- */
+
+// No iPhone isto só existe se o app tiver sido adicionado à Tela de Início.
+// Numa aba comum do Safari, PushManager não existe e o botão nem aparece.
+function temPush() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+function chaveVapid() {
+  var b64 = (window.CONFIG.VAPID + '='.repeat((4 - window.CONFIG.VAPID.length % 4) % 4))
+              .replace(/-/g, '+').replace(/_/g, '/');
+  var cru = atob(b64), arr = new Uint8Array(cru.length);
+  for (var i = 0; i < cru.length; i++) arr[i] = cru.charCodeAt(i);
+  return arr;
+}
+
+async function inscricaoAtual() {
+  if (!temPush()) return null;
+  var reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) return null;
+  return await reg.pushManager.getSubscription();
+}
+
+async function pintarBotaoAvisos() {
+  if (!temPush()) { el.btnAvisos.hidden = true; return; }
+  el.btnAvisos.hidden = false;
+  el.btnAvisos.className = 'avisos';
+  if (Notification.permission === 'denied') {
+    el.btnAvisos.className = 'avisos bloqueado';
+    el.btnAvisos.textContent = 'avisos bloqueados nos Ajustes do aparelho';
+    return;
+  }
+  var sub = await inscricaoAtual();
+  if (sub) {
+    el.btnAvisos.className = 'avisos ligado';
+    el.btnAvisos.textContent = '✓ avisos ligados neste aparelho';
+  } else {
+    el.btnAvisos.textContent = 'Avisar neste aparelho';
+  }
+}
+
+el.btnAvisos.addEventListener('click', async function () {
+  if (Notification.permission === 'denied') {
+    aviso('Libere as notificações nos Ajustes do aparelho, para o Nossas Contas.');
+    return;
+  }
+  el.btnAvisos.disabled = true;
+  try {
+    var jaTem = await inscricaoAtual();
+    if (jaTem) {
+      await db.from('push_inscricao').delete().eq('endpoint', jaTem.endpoint);
+      await jaTem.unsubscribe();
+      aviso('Avisos desligados neste aparelho.');
+    } else {
+      var permissao = await Notification.requestPermission();
+      if (permissao !== 'granted') { aviso('Sem permissão, não dá para avisar.'); return; }
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: chaveVapid()
+      });
+      var j = sub.toJSON();
+      var r = await db.from('push_inscricao').upsert({
+        casa_id: eu.casa_id, perfil_id: eu.id,
+        endpoint: sub.endpoint,
+        p256dh: j.keys.p256dh, auth: j.keys.auth,
+        aparelho: (navigator.userAgent.indexOf('iPhone') >= 0 ? 'iPhone' : 'outro'),
+        falhas: 0, ultimo_erro: null
+      }, { onConflict: 'endpoint' });
+      if (r.error) { await sub.unsubscribe(); aviso('Não deu para salvar. ' + r.error.message); return; }
+      aviso('Pronto. Você recebe um resumo por dia.');
+    }
+  } catch (e) {
+    aviso('Não deu certo: ' + (e && e.message ? e.message : e));
+  } finally {
+    el.btnAvisos.disabled = false;
+    await pintarBotaoAvisos();
+  }
+});
+
 /* ---------- navegar entre meses ---------- */
 
 function irPara(c) {
@@ -660,6 +740,7 @@ async function abrirApp() {
   await carregarModelos();
   await carregarMes();
   ligarTempoReal();
+  pintarBotaoAvisos();
 }
 
 (async function iniciar() {

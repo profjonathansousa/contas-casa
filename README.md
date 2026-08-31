@@ -26,9 +26,12 @@ CONTAS_CASA/
 ├── sql/
 │   ├── 01_schema_rls.sql      schema + RLS (rodar uma vez)
 │   ├── 05_modelos.sql         contas fixas + gerar_mes() + fixar_mes()
+│   ├── 06_push.sql            inscrições de aviso + resumo_do_dia()
 │   ├── 02_config_inicial.sql  modelo: cria a casa e os dois perfis
 │   └── 03_seed_ficticio.sql   dados de mentira, opcional, só para ver a tela
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
+├── avisos/                    envio do resumo diário (roda só no Actions)
+├── .github/workflows/         cron diário do aviso
 ├── testes/                    bancada: roda app.js e sw.js reais no jsc
 ├── vendor/supabase.js         supabase-js 2.112.4 (UMD), versionado de propósito
 ├── index.html
@@ -67,7 +70,7 @@ do mês volta para o mês corrente.
 ```
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS),
-com DOM, relógio e Supabase falsos. Tem que fechar em 81 / 4 / 11 medidas e
+com DOM, relógio e Supabase falsos. Tem que fechar em 81 / 4 / 23 / 11 medidas e
 zero falhas.
 
 ## Modelo de dados
@@ -112,8 +115,12 @@ a pagar e a contagem de itens em aberto sem valor; editar valor; adicionar
 conta avulsa; apagar conta segurando o dedo; navegar entre meses; PWA
 instalável; contas fixas com geração do mês.
 
-**Fase 2** — Web Push com VAPID, bot do Telegram como redundância, GitHub
-Actions com cron diário, offline com IndexedDB e fila de pendências.
+**Fase 2** — Web Push com VAPID e cron diário no GitHub Actions: **feito**.
+Falta o bot do Telegram como redundância e o offline com IndexedDB.
+
+O aviso é **um por dia, e só quando há o que dizer**: dia sem conta vencendo e
+sem atraso não gera notificação nenhuma. Notificação que chega todo dia sem
+motivo é notificação que a pessoa aprende a ignorar.
 
 **Fase 3** — modelos recorrentes e geração automática do mês, parcelas,
 gráficos, importação de histórico, receitas.

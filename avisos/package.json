@@ -1,0 +1,7 @@
+{
+  "name": "nossas-contas-avisos",
+  "private": true,
+  "type": "module",
+  "description": "Envia o resumo diario por Web Push. Roda so no GitHub Actions.",
+  "dependencies": { "web-push": "^3.6.7" }
+}

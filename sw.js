@@ -2,7 +2,7 @@
    Guarda só os arquivos do próprio app. Nada do Supabase é cacheado — dado de
    conta tem que vir do servidor, senão a tela mente. Fila offline é fase 2. */
 
-var VERSAO = 'nossas-contas-v3';
+var VERSAO = 'nossas-contas-v4';
 var CASCA = [
   './', './index.html', './app.css', './app.js', './config.js',
   './vendor/supabase.js', './manifest.webmanifest',
@@ -46,6 +46,40 @@ self.addEventListener('fetch', function (ev) {
       return caches.match(req).then(function (c) {
         return c || caches.match('./index.html');
       });
+    })
+  );
+});
+
+/* ---------- avisos ---------- */
+
+self.addEventListener('push', function (ev) {
+  var d = {};
+  try { d = ev.data ? ev.data.json() : {}; }
+  catch (e) { d = { corpo: ev.data ? ev.data.text() : '' }; }
+  ev.waitUntil(self.registration.showNotification(d.titulo || 'Nossas Contas', {
+    body:  d.corpo || '',
+    icon:  './icones/icone-192.png',
+    badge: './icones/icone-192.png',
+    lang:  'pt-BR',
+    tag:   d.tag || 'contas-do-dia',   // um aviso por dia substitui o anterior
+    renotify: true,
+    data:  { url: d.url || './index.html' }
+  }));
+});
+
+self.addEventListener('notificationclick', function (ev) {
+  ev.notification.close();
+  var destino = (ev.notification.data && ev.notification.data.url) || './index.html';
+  ev.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (abas) {
+      for (var i = 0; i < abas.length; i++) {
+        if (abas[i].url.indexOf(self.registration.scope) === 0 && 'focus' in abas[i]) {
+          return abas[i].focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(new URL(destino, self.location.href).href);
+      }
     })
   );
 });

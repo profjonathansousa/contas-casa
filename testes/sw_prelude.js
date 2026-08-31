@@ -1,5 +1,12 @@
 if (typeof URL === 'undefined') {
-  URL = function (u) { var m = /^([a-z]+:\/\/[^\/]+)(.*)$/.exec(u); this.origin = m ? m[1] : ''; this.pathname = m ? m[2] : u; };
+  URL = function (u, base) {
+    var abs = u;
+    if (!/^[a-z]+:\/\//.test(u)) {
+      abs = String(base || '').replace(/[^\/]*$/, '') + String(u).replace(/^\.\//, '');
+    }
+    var m = /^([a-z]+:\/\/[^\/]+)(.*)$/.exec(abs);
+    this.origin = m ? m[1] : ''; this.pathname = m ? m[2] : abs; this.href = abs;
+  };
 }
 var GUARDADO = {};      // nome do cache -> { url: resposta }
 var REDE_CAI = false;
@@ -33,10 +40,29 @@ var caches = {
 };
 
 var ouvintes = {};
+var MOSTRADAS = [];      // notificacoes que o sw pediu para mostrar
+var ABAS = [];           // janelas abertas do app
+var ABERTAS = [];        // janelas que o sw mandou abrir
+var FOCADAS = [];
+var ESCOPO = 'https://exemplo.github.io/contas-casa/';
 var self = {
   addEventListener: function (n, f) { ouvintes[n] = f; },
   skipWaiting: function () { return Promise.resolve('skipWaiting'); },
-  clients: { claim: function () { return Promise.resolve('claim'); } },
-  location: { origin: 'https://exemplo.github.io' }
+  clients: {
+    claim: function () { return Promise.resolve('claim'); },
+    matchAll: function () { return Promise.resolve(ABAS); },
+    openWindow: function (u) { ABERTAS.push(u); return Promise.resolve({ url: u }); }
+  },
+  registration: {
+    scope: ESCOPO,
+    showNotification: function (titulo, opcoes) {
+      MOSTRADAS.push({ titulo: titulo, opcoes: opcoes });
+      return Promise.resolve();
+    }
+  },
+  location: { origin: 'https://exemplo.github.io', href: ESCOPO + 'sw.js' }
 };
+function aba(url) {
+  return { url: url, focus: function () { FOCADAS.push(url); return Promise.resolve(); } };
+}
 function disparar(nome, ev) { ouvintes[nome](ev); }

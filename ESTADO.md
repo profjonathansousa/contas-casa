@@ -1,6 +1,6 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 31/08/2026 — fim do bloco 4: contas fixas. NO AR.
+Atualizado em 31/08/2026 — fim do bloco 5: notificação push. NO AR.
 
 ## O que foi feito
 
@@ -185,13 +185,68 @@ parcelados, uma parcela de imposto e um material escolar. Controle de parcelas
 ligadas nas fixas, e cabe a Jonathan desligá-las quando acabarem. Quais são
 elas está no banco e na conversa, não aqui.
 
+## Bloco 5 — notificação push (31/08/2026)
+
+Banco (`sql/06_push.sql`): tabela `push_inscricao` com RLS por **pessoa**, não
+por casa — cada um manda só nos próprios aparelhos. Mais a função
+`resumo_do_dia(dia)`, `security invoker`: o robô entra com a chave de serviço e
+enxerga todas as casas; uma pessoa logada chama a MESMA função e a RLS a limita
+à casa dela. Uma função, dois usos, nenhum furo. Medido.
+
+Chaves VAPID geradas com `openssl` e guardadas em GitHub Secrets
+(`VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`). A privada foi
+apagada da máquina e nunca foi impressa. A pública está no `config.js`, que é
+onde ela deve estar.
+
+App: botão no rodapé que pede permissão, inscreve e grava. Toca de novo,
+desliga. O botão só aparece onde `PushManager` existe — numa aba comum do
+Safari do iPhone ele nem aparece, porque lá push não funciona.
+
+`sw.js`: recebe o `push` e mostra a notificação; o toque foca o app se já
+estiver aberto, e só abre janela nova se não estiver. Mensagem que não for JSON
+não derruba o service worker (medido).
+
+Agendador: `.github/workflows/avisos.yml`, cron diário às 11:00 UTC (08:00 de
+Brasília) mais disparo manual com data simulada e modo seco. O envio é o
+`avisos/enviar.mjs`, que usa `web-push` do npm — **no Actions, não no
+frontend**.
+
+Bancada: **81 / 4 / 23 / 11 medidas, 0 falhas.** O quarto bloco recorta do
+`enviar.mjs` real as funções puras que montam o texto e mede o resultado; não
+reimplementa nada.
+
+## Falta um segredo, e só Jonathan pode pôr
+
+`SUPABASE_SERVICE_ROLE` ainda **não** está nos GitHub Secrets. Sem ela o
+workflow falha na primeira execução. Está em Supabase > Settings > API Keys,
+escondida atrás de "Reveal". Comando:
+
+```
+gh secret set SUPABASE_SERVICE_ROLE -R profjonathansousa/contas-casa
+```
+
+(cola a chave quando ele pedir, e ela não fica no histórico do terminal)
+
+## O que ainda NÃO foi provado
+
+1. **Envio de verdade.** Nenhuma notificação chegou a nenhum aparelho ainda.
+   Falta o segredo acima e falta alguém inscrito.
+2. **Login da esposa.** Nunca aconteceu.
+3. **Realtime entre dois aparelhos.**
+4. **Pontualidade do cron.** O do GitHub entra em fila e atrasa; não é defeito
+   nosso, é como ele funciona.
+
+## Fora do escopo do bloco 5, de propósito
+
+Bot do Telegram (a redundância) e offline com IndexedDB continuam por fazer.
+Controle de parcelas continua na fase 3.
+
 ## PRÓXIMA AÇÃO EXATA
 
-Jonathan, no iPhone:
-1. Abrir setembro (seta ›). Conferir os 21 lançamentos.
-2. Rodapé > "contas fixas" > "Transformar as contas do mês em fixas".
-3. **Desligar** as cinco parcelas/one-offs (ver o buraco conhecido acima).
-4. Ir para outubro e tocar em "Trazer N contas fixas". Tem que aparecer a lista
-   inteira, com "Dom mercado" ainda em "???".
-
-Depois disso, decidir entre parcelas (fase 3) e push (fase 2).
+1. Jonathan põe `SUPABASE_SERVICE_ROLE` nos Secrets (comando acima).
+2. No iPhone, abre o app e toca em **"Avisar neste aparelho"**. Tem que pedir
+   permissão e depois mostrar "✓ avisos ligados neste aparelho".
+3. No GitHub: Actions > "Aviso diário das contas" > Run workflow, marcando
+   **seco** — mostra o que enviaria sem enviar. Conferir o texto.
+4. Rodar de novo **sem** o seco. A notificação tem que chegar no iPhone.
+5. Só depois disso: Telegram, ou parcelas, ou offline.
