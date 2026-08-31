@@ -1,6 +1,6 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 31/08/2026 — fim do bloco 2 (interface escrita e testada).
+Atualizado em 31/08/2026 — fim do bloco 3. NO AR.
 
 ## O que foi feito
 
@@ -98,31 +98,60 @@ No navegador, servindo em 127.0.0.1:
 | tela do mês, iPhone 375px, claro e escuro | conferida por captura |
 | service worker registrando | **NÃO verificado** — o painel de navegador bloqueia |
 
+## Publicado em 31/08/2026
+
+Repositório público `profjonathansousa/contas-casa`, 6 commits, 27 arquivos.
+
+**Endereço: https://jonathansousa.com.br/contas-casa/**
+(também responde em https://profjonathansousa.github.io/contas-casa/)
+
+Atenção: o app caiu no domínio profissional porque o site de usuário do
+GitHub Pages já tem esse domínio configurado, e projeto herda. Nada de conta
+aparece sem login, mas o endereço é público. Se Jonathan preferir outro,
+dá para pôr um CNAME próprio no repositório.
+
+A autoria dos 6 commits foi reescrita para
+`297038968+profjonathansousa@users.noreply.github.com`, porque a conta bloqueia
+push que expõe o e-mail pessoal. Histórico e arquivos intactos (6 commits,
+27 arquivos, conferidos depois da reescrita). O `user.email` local do
+repositório já está apontando para o noreply — os próximos commits saem certos
+sem precisar fazer nada.
+
+## Medido no site publicado
+
+| medição | resultado |
+|---|---|
+| index e os 7 arquivos-chave | 200 em HTTPS |
+| service worker | **registrado e ativo**, escopo `/contas-casa/` |
+| casca guardada no cache | 11 arquivos, batendo com a lista do `sw.js` |
+| manifest | "Nossas Contas", standalone, 3 ícones |
+| leitura sem sessão (controle negativo) | `permission denied for table lancamento` |
+| senha errada (controle negativo) | `Invalid login credentials` |
+
+O service worker não registrava no servidor local de teste; no site publicado,
+registra. Aquele erro era do painel de navegador, como eu suspeitava.
+
 ## O que ainda NÃO foi provado
 
-1. **Login de verdade.** Não tenho senha de ninguém e a criação de um usuário
-   de teste por SQL foi bloqueada. Jonathan e Diva precisam entrar de fato.
-2. **Instalar na tela de início.** O service worker não registra no painel de
-   navegador usado aqui (`unknown error occurred when fetching the script`),
-   embora `sw.js` responda 200 e o contexto seja seguro. Só o iPhone prova.
-3. **Realtime entre dois aparelhos.** A bancada prova que o app reage ao evento;
-   ela não prova que o evento chega pela rede.
-
-## Pendências pequenas
-
-- Os nove lançamentos são o seed fictício. Apagar com
-  `delete from public.lancamento where observacao = 'seed';`
-- ~~Não há como apagar um lançamento pela tela.~~ **Feito em 31/08/2026,** a
-  pedido de Jonathan: segurar o dedo na linha por meio segundo abre a
-  confirmação. Toque curto e rolagem não disparam (medido). A política
-  `lancamento_apagar` foi provada no banco: eu apago 1 na minha casa, um
-  estranho tentando apagar o mês inteiro remove 0.
+1. **Login de verdade.** Não tenho senha de ninguém e criar usuário de teste
+   por SQL foi bloqueado. Jonathan e Diva precisam entrar de fato.
+2. **Instalar na tela de início do iPhone.** O service worker registra e o
+   manifest está certo, mas o "Adicionar à Tela de Início" do Safari só o
+   aparelho prova.
+3. **Realtime entre dois aparelhos.** A bancada prova que o app reage ao
+   evento; ela não prova que o evento chega pela rede.
 
 ## PRÓXIMA AÇÃO EXATA
 
-Publicar no GitHub Pages, para dar para testar no iPhone. **Ainda não foi
-feito** — o repositório existe só localmente, nada foi enviado para lugar
-nenhum, e enviar depende de Jonathan autorizar.
+Teste nos dois iPhones, nesta ordem:
 
-Depois de publicado: os dois entram, marcam uma conta cada um, e conferem se a
-tela do outro muda sozinha e se o selo mostra o nome certo.
+1. Abrir https://jonathansousa.com.br/contas-casa/ no Safari e entrar.
+2. Compartilhar > Adicionar à Tela de Início. Fechar o Safari e abrir pelo
+   ícone: tem que abrir direto no mês, sem barra de endereço.
+3. Os dois abertos ao mesmo tempo: um marca uma conta, e a tela do outro tem
+   que mudar sozinha, com o selo dizendo o nome certo.
+4. Segurar uma conta e apagar.
+5. Quando estiver aprovado, limpar o seed fictício:
+   `delete from public.lancamento where observacao = 'seed';`
+
+Só depois disso começa a fase 2.
