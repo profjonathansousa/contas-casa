@@ -25,6 +25,7 @@ CONTAS_CASA/
 ├── .nojekyll                  desliga o Jekyll no GitHub Pages
 ├── sql/
 │   ├── 01_schema_rls.sql      schema + RLS (rodar uma vez)
+│   ├── 05_modelos.sql         contas fixas + gerar_mes() + fixar_mes()
 │   ├── 02_config_inicial.sql  modelo: cria a casa e os dois perfis
 │   └── 03_seed_ficticio.sql   dados de mentira, opcional, só para ver a tela
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
@@ -37,6 +38,19 @@ CONTAS_CASA/
 ├── manifest.webmanifest
 └── sw.js                      service worker mínimo
 ```
+
+## Contas fixas
+
+Para não redigitar a lista toda no dia 1º. Cada conta fixa guarda descrição,
+dia e um valor padrão — e **valor padrão vazio continua vazio todo mês**, que é
+o caso da conta de mercado, cujo valor só se sabe depois.
+
+O botão "Transformar as contas do mês em fixas" cria as fixas de uma vez a
+partir do mês que está na tela. Depois é só desligar as que não se repetem.
+Num mês onde falta alguma fixa, a tela do mês mostra "Trazer N contas fixas".
+
+Gerar o mês duas vezes não duplica nada: a comparação é por descrição, então
+conta já digitada na mão também não vem repetida.
 
 ## Como se usa
 
@@ -53,7 +67,7 @@ do mês volta para o mês corrente.
 ```
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS),
-com DOM, relógio e Supabase falsos. Tem que fechar em 55 / 4 / 11 medidas e
+com DOM, relógio e Supabase falsos. Tem que fechar em 81 / 4 / 11 medidas e
 zero falhas.
 
 ## Modelo de dados
@@ -96,7 +110,7 @@ agrupada por dia de vencimento; toque único marca e desmarca pago; sync em
 tempo real; selo "pago por fulano, 14:32"; cabeçalho fixo com previsto / pago /
 a pagar e a contagem de itens em aberto sem valor; editar valor; adicionar
 conta avulsa; apagar conta segurando o dedo; navegar entre meses; PWA
-instalável.
+instalável; contas fixas com geração do mês.
 
 **Fase 2** — Web Push com VAPID, bot do Telegram como redundância, GitHub
 Actions com cron diário, offline com IndexedDB e fila de pendências.

@@ -46,19 +46,45 @@
     <button id="t-aberto" class="aberto" hidden></button>
   </header>
 
+  <button id="btn-gerar" class="gerar" hidden></button>
   <div id="lista" class="lista"></div>
   <footer class="rodape">
     <p class="dica">Segure uma conta para apagar.</p>
-    <button id="btn-sair" class="sair">sair</button>
+    <div class="links">
+      <button id="btn-fixas" class="sair">contas fixas</button>
+      <button id="btn-sair" class="sair">sair</button>
+    </div>
   </footer>
 
   <button id="btn-add" class="fab" aria-label="Adicionar conta">+</button>
 </main>
 
+<!-- ---------- contas fixas ---------- -->
+<section id="tela-fixas" class="tela" hidden>
+  <header class="topo">
+    <div class="linha-mes">
+      <button id="fx-voltar" class="seta" aria-label="Voltar">&lsaquo;</button>
+      <span class="nome-mes">Contas fixas</span>
+      <span class="seta" aria-hidden="true"></span>
+    </div>
+    <p class="fx-explica">O que estiver ligado aqui aparece sozinho quando você
+      gerar um mês novo. Valor vazio continua vazio todo mês.</p>
+  </header>
+
+  <button id="fx-do-mes" class="gerar" hidden></button>
+  <div id="fx-lista" class="lista"></div>
+
+  <footer class="rodape">
+    <p class="dica">Toque para ligar ou desligar. Segure para apagar.</p>
+  </footer>
+
+  <button id="fx-add" class="fab" aria-label="Nova conta fixa">+</button>
+</section>
+
 <!-- ---------- adicionar conta avulsa ---------- -->
 <div id="fundo-add" class="fundo" hidden></div>
 <form id="folha-add" class="folha" hidden>
-  <h2>Nova conta</h2>
+  <h2 id="ad-titulo">Nova conta</h2>
   <label for="ad-desc">Descrição</label>
   <input id="ad-desc" type="text" enterkeyhint="next" autocapitalize="sentences" required>
   <div class="dupla">

@@ -19,8 +19,9 @@ esperar();
 
 print('\n== 1. abriu no mes corrente e pediu so esse mes ==');
 var MESHOJE = (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';})();
-medir('selects feitos', LOG.selects.length, 1);
-medir('competencia pedida', LOG.selects[0].comp, MESHOJE);
+medir('selects feitos', LOG.selects.length, 2);      // modelo + lancamento
+medir('primeiro foi o das fixas', LOG.selects[0].tabela, 'modelo');
+medir('competencia pedida', LOG.selects[1].comp, MESHOJE);
 medir('tela de login escondida', q('#tela-login').hidden, true);
 medir('tela do mes visivel', q('#tela-mes').hidden, false);
 
@@ -45,7 +46,7 @@ var pagos = itensDesenhados().filter(function (i) { return i.className.indexOf('
 medir('itens ja pagos', pagos.length, 1);
 var selo = null;
 (function busca(el){ if (el.className==='selo') selo = el._txt; el.filhos.forEach(busca); })(pagos[0]);
-medir('formato do selo', /^pago por Diva, \d\d:\d\d$/.test(selo || ''), true);
+medir('formato do selo', /^pago por Marina, \d\d:\d\d$/.test(selo || ''), true);
 
 print('\n== 5. um toque marca pago, mandando UM campo so ==');
 var antesUp = LOG.updates.length;
@@ -127,7 +128,7 @@ LOG.canais[0].fn({ eventType: 'UPDATE', new: {
 medir('mudou sozinho, sem eu tocar', itensDesenhados()[0].className.indexOf('pago') > 0, true);
 var selo3 = null;
 (function busca(el){ if (el.className==='selo') selo3 = el._txt; el.filhos.forEach(busca); })(itensDesenhados()[0]);
-medir('selo diz quem foi', /^pago por Diva, \d\d:\d\d$/.test(selo3 || ''), true);
+medir('selo diz quem foi', /^pago por Marina, \d\d:\d\d$/.test(selo3 || ''), true);
 
 print('\n== 11. CONTROLE NEGATIVO ==');
 print('  (se a bancada nao medisse nada de verdade, isto passaria — tem que falhar)');
@@ -186,6 +187,90 @@ outro.disparar('pointerdown');
 outro.disparar('pointermove', { clientX: 0, clientY: 90, preventDefault: function(){}, stopPropagation: function(){} });
 avancarTempo(2000);
 medir('rolar a lista NAO abre a confirmacao', q('#folha-apagar').hidden, true);
+
+print('\n== 13. contas fixas ==');
+function fixasDesenhadas() {
+  return q('#fx-lista').filhos.filter(function (f) { return f.className.indexOf('item') === 0; });
+}
+// No mes ja existem Aluguel e Luz; Escola esta desligada; falta so Condominio.
+medir('botao de trazer aparece', q('#btn-gerar').hidden, false);
+medir('e diz quantas faltam', q('#btn-gerar')._txt, 'Trazer 1 conta fixa para este mês');
+
+q('#btn-fixas').disparar('click');
+esperar();
+medir('abriu a tela de fixas', q('#tela-fixas').hidden, false);
+medir('escondeu a tela do mes', q('#tela-mes').hidden, true);
+medir('desenhou as fixas', fixasDesenhadas().length, 4);
+var desligadas = fixasDesenhadas().filter(function (f) { return f.className.indexOf('desligado') > 0; });
+medir('uma esta desligada', desligadas.length, 1);
+
+print('\n  -- tocar liga e desliga --');
+var upA = LOG.updates.length;
+fixasDesenhadas()[2].disparar('click');          // Escola, desligada
+esperar();
+medir('campos no update', LOG.updates[upA].campos, ['ativo']);
+medir('valor enviado', LOG.updates[upA].valores.ativo, true);
+medir('tabela', LOG.updates[upA].tabela, 'modelo');
+medir('acendeu na tela', fixasDesenhadas()[2].className.indexOf('desligado') > 0, false);
+
+print('\n  -- editar o valor padrao --');
+var luzFixa = fixasDesenhadas()[1];              // Luz, sem valor
+medir('mostra ??? antes', luzFixa.filhos[2]._html, '???');
+var upB = LOG.updates.length;
+luzFixa.filhos[2].disparar('click');
+var campoF = fixasDesenhadas()[1].filhos[2];
+campoF.value = '210,90';
+campoF.disparar('blur');
+esperar();
+medir('campos no update', LOG.updates[upB].campos, ['valor_padrao']);
+medir('numero interpretado', LOG.updates[upB].valores.valor_padrao, 210.90);
+
+print('\n  -- segurar apaga a fixa (nao o lancamento) --');
+var delA = LOG.deletes.length;
+fixasDesenhadas()[3].disparar('pointerdown');
+avancarTempo(700);
+medir('pediu confirmacao', q('#folha-apagar').hidden, false);
+medir('diz qual', q('#ap-desc')._txt, 'Condominio');
+q('#ap-confirmar').disparar('click');
+esperar();
+medir('apagou na tabela certa', LOG.deletes[delA].tabela, 'modelo');
+medir('sumiu da lista de fixas', fixasDesenhadas().length, 3);
+
+print('\n  -- o + desta tela cria fixa, nao lancamento --');
+var insA = LOG.inserts.length;
+q('#fx-add').disparar('click');
+medir('titulo da folha', q('#ad-titulo')._txt, 'Nova conta fixa');
+q('#ad-desc').value = 'Seguro';
+q('#ad-dia').value = '9';
+q('#ad-valor').value = '77,00';
+q('#folha-add').disparar('submit');
+esperar();
+medir('inserts feitos', LOG.inserts.length - insA, 1);
+medir('virou modelo, com valor_padrao', Object.keys(LOG.inserts[insA]).sort(),
+      ['casa_id','descricao','dia_vencimento','valor_padrao']);
+medir('voltou a ter 4 fixas', fixasDesenhadas().length, 4);
+
+print('\n  -- voltar e gerar o mes --');
+q('#fx-voltar').disparar('click');
+esperar();
+medir('voltou para o mes', q('#tela-mes').hidden, false);
+var rpcA = LOG.rpcs.length;
+q('#btn-gerar').disparar('click');
+esperar();
+medir('chamou a funcao do banco', LOG.rpcs[rpcA].nome, 'gerar_mes');
+medir('para o mes que esta na tela', LOG.rpcs[rpcA].args.p_competencia, MESHOJE);
+
+print('\n  -- CONTROLE NEGATIVO --');
+print('  (se nenhuma fixa faltasse, o botao NAO podia aparecer)');
+var guardaM = MODELOS.slice();
+MODELOS.length = 0;
+MODELOS.push(mod('so-essa', 'Aluguel', 5, 1800, true));   // ja existe no mes
+q('#btn-fixas').disparar('click');
+esperar();
+q('#fx-voltar').disparar('click');
+esperar();
+medir('botao sumiu quando nao falta nada', q('#btn-gerar').hidden, true);
+guardaM.forEach(function (x) { MODELOS.push(x); });
 
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

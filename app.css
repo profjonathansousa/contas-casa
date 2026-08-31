@@ -107,6 +107,19 @@ button { border: 0; background: none; cursor: pointer; }
 .lista { padding: 6px 10px 8px; }
 .rodape { padding: 18px 10px calc(110px + env(safe-area-inset-bottom)); text-align: center; }
 .dica { color: var(--fraco); font-size: 13.5px; margin: 0 0 6px; }
+.links { display: flex; justify-content: center; gap: 4px; }
+.gerar {
+  display: block; margin: 12px 10px 2px; width: calc(100% - 20px); padding: 16px 14px;
+  background: var(--verde); color: #fff; border-radius: var(--raio);
+  font-size: 17px; font-weight: 600;
+}
+.gerar:active { opacity: .75; }
+.fx-explica { margin: 6px 2px 0; font-size: 13.5px; line-height: 1.35; opacity: .8; }
+
+/* conta fixa desligada: continua legível, mas claramente fora do ar */
+.item.desligado { opacity: .45; }
+.item.desligado .marca { border-style: dashed; }
+.fx-dia { font-size: 13.5px; color: var(--fraco); margin-top: 2px; }
 .dia {
   font-size: 13px; font-weight: 700; color: var(--fraco);
   text-transform: uppercase; letter-spacing: .08em;
@@ -125,7 +138,7 @@ button { border: 0; background: none; cursor: pointer; }
   border: 2px solid var(--borda); display: grid; place-items: center;
   color: #fff; font-size: 15px; font-weight: 700;
 }
-.item.pago .marca { background: var(--pago); border-color: var(--pago); }
+.item.pago .marca, .marca.aceso { background: var(--pago); border-color: var(--pago); }
 .corpo { flex: 1; min-width: 0; }
 .desc {
   font-size: 19px; font-weight: 500; letter-spacing: -.01em;

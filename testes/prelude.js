@@ -1,6 +1,6 @@
 /* Bancada: DOM e Supabase falsos. Nada da logica do app e reimplementado --
    o app.js real roda em cima disto. */
-var LOG = { selects: [], updates: [], inserts: [], deletes: [], canais: [] };
+var LOG = { selects: [], updates: [], inserts: [], deletes: [], rpcs: [], canais: [] };
 
 function Elem(tag) {
   this.tag = tag; this.filhos = []; this.hs = {}; this._txt = ''; this._html = '';
@@ -79,6 +79,16 @@ function lanc(id, desc, dia, valor, pago) {
            pago_em: pago ? '2026-08-31T14:32:00.000Z' : null,
            pago_por: pago ? ID_OUTRO : null };
 }
+function mod(id, desc, dia, valor, ativo) {
+  return { id: id, descricao: desc, dia_vencimento: dia, valor_padrao: valor, ativo: !!ativo };
+}
+// Aluguel e Luz JA estao no mes; Condominio falta; Escola esta desligada.
+var MODELOS = [
+  mod('m1', 'Aluguel', 5, 1800.00, true),
+  mod('m2', 'Luz', 8, null, true),
+  mod('m3', 'Escola', 15, 740.00, false),
+  mod('m4', 'Condominio', 31, 480.00, true)
+];
 var BANCO = [
   lanc('l1', 'Aluguel', 5, 1800.00, false),
   lanc('l2', 'Luz', 8, null, false),
@@ -113,13 +123,25 @@ var supabase = {
         return c;
       },
       removeChannel: function () {},
+      rpc: function (nome, args) {
+        LOG.rpcs.push({ nome: nome, args: args });
+        return thenable(function () {
+          if (nome === 'gerar_mes') return { data: 1, error: null };
+          return { data: MODELOS.length, error: null };
+        });
+      },
       from: function (tabela) {
         return {
           select: function (cols) {
             var t = thenable(function () {
               if (tabela === 'perfil') {
                 return { data: [ { id: ID_EU, casa_id: CASA, nome: 'Jonathan' },
-                                 { id: ID_OUTRO, casa_id: CASA, nome: 'Diva' } ], error: null };
+                                 { id: ID_OUTRO, casa_id: CASA, nome: 'Marina' } ], error: null };
+              }
+              if (tabela === 'modelo') {
+                LOG.selects.push({ tabela: 'modelo' });
+                return { data: MODELOS.map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }),
+                         error: null };
               }
               LOG.selects.push({ tabela: tabela, comp: t._eq && t._eq.competencia });
               return { data: BANCO.map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }), error: null };

@@ -1,6 +1,6 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 31/08/2026 — fim do bloco 3. NO AR.
+Atualizado em 31/08/2026 — fim do bloco 4: contas fixas. NO AR.
 
 ## O que foi feito
 
@@ -131,27 +131,67 @@ sem precisar fazer nada.
 O service worker não registrava no servidor local de teste; no site publicado,
 registra. Aquele erro era do painel de navegador, como eu suspeitava.
 
+## Bloco 4 — contas fixas (31/08/2026)
+
+Feito **a pedido de Jonathan, fora da ordem original**: era fase 3, mas sem
+isso ele redigitaria vinte contas todo dia 1º, e nesse ponto o app perdia do
+app de notas.
+
+Banco (`sql/05_modelos.sql`): tabela `modelo` com RLS própria, FK de
+`lancamento.modelo_id`, e duas funções `security invoker` (a RLS continua
+valendo): `gerar_mes(competencia)` e `fixar_mes(competencia)`. A comparação
+para não duplicar é por **descrição**, não por `modelo_id` — assim conta
+digitada na mão também não vem repetida.
+
+Tela: segunda tela "Contas fixas", alcançada pelo rodapé. Toque liga e desliga;
+toque no valor edita o padrão; segurar apaga. O `+` dessa tela cria fixa, não
+lançamento. Na tela do mês aparece "Trazer N contas fixas" quando falta alguma.
+
+Provas no banco, com controle negativo:
+
+| medição | resultado |
+|---|---|
+| setembro virando fixas | 21 |
+| modelos sem valor (o "???") | 1 |
+| gerar setembro DE NOVO | 0 |
+| gerar outubro | 21, com o "???" ainda vazio e nada marcado como pago |
+| novembro com uma fixa desligada | 20 |
+| estranho enxergando modelos | 0 |
+| estranho gerando mês | bloqueado: "Você não pertence a nenhuma casa" |
+
+Bancada: **81 / 4 / 11 medidas, 0 falhas.**
+
+## Dados reais
+
+Setembro/2026 foi inserido direto no banco por `psql`, a partir da lista que
+Jonathan mandou: 21 lançamentos, um deles sem valor. **Descrições, credores e
+valores não estão no repositório** — nem em arquivo, nem em commit, nem aqui.
+Para conferir os números, olhar o banco. O seed fictício de agosto foi apagado
+(9 linhas).
+
 ## O que ainda NÃO foi provado
 
-1. **Login de verdade.** Não tenho senha de ninguém e criar usuário de teste
-   por SQL foi bloqueado. Jonathan e Diva precisam entrar de fato.
-2. **Instalar na tela de início do iPhone.** O service worker registra e o
-   manifest está certo, mas o "Adicionar à Tela de Início" do Safari só o
-   aparelho prova.
-3. **Realtime entre dois aparelhos.** A bancada prova que o app reage ao
+1. **Login de verdade.** Nunca entrei no app; não tenho senha de ninguém.
+   (Jonathan confirmou que entrou e instalou na tela de início. A esposa ainda não.)
+2. **Realtime entre dois aparelhos.** A bancada prova que o app reage ao
    evento; ela não prova que o evento chega pela rede.
+3. **Contas fixas no aparelho.** Provei no banco e na bancada, não no iPhone.
+
+## Buraco conhecido
+
+Cinco das contas de setembro **não são mensais para sempre** — são acordos
+parcelados, uma parcela de imposto e um material escolar. Controle de parcelas
+é fase 3. Enquanto não existir, essas contas voltam todo mês se estiverem
+ligadas nas fixas, e cabe a Jonathan desligá-las quando acabarem. Quais são
+elas está no banco e na conversa, não aqui.
 
 ## PRÓXIMA AÇÃO EXATA
 
-Teste nos dois iPhones, nesta ordem:
+Jonathan, no iPhone:
+1. Abrir setembro (seta ›). Conferir os 21 lançamentos.
+2. Rodapé > "contas fixas" > "Transformar as contas do mês em fixas".
+3. **Desligar** as cinco parcelas/one-offs (ver o buraco conhecido acima).
+4. Ir para outubro e tocar em "Trazer N contas fixas". Tem que aparecer a lista
+   inteira, com "Dom mercado" ainda em "???".
 
-1. Abrir https://jonathansousa.com.br/contas-casa/ no Safari e entrar.
-2. Compartilhar > Adicionar à Tela de Início. Fechar o Safari e abrir pelo
-   ícone: tem que abrir direto no mês, sem barra de endereço.
-3. Os dois abertos ao mesmo tempo: um marca uma conta, e a tela do outro tem
-   que mudar sozinha, com o selo dizendo o nome certo.
-4. Segurar uma conta e apagar.
-5. Quando estiver aprovado, limpar o seed fictício:
-   `delete from public.lancamento where observacao = 'seed';`
-
-Só depois disso começa a fase 2.
+Depois disso, decidir entre parcelas (fase 3) e push (fase 2).

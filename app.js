@@ -20,7 +20,10 @@ var el = {
   adDia: $('#ad-dia'), adValor: $('#ad-valor'), adCancelar: $('#ad-cancelar'),
   erroAdd: $('#erro-add'), aviso: $('#aviso'),
   fundoApagar: $('#fundo-apagar'), folhaApagar: $('#folha-apagar'),
-  apDesc: $('#ap-desc'), apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar')
+  apDesc: $('#ap-desc'), apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar'),
+  adTitulo: $('#ad-titulo'), btnGerar: $('#btn-gerar'), btnFixas: $('#btn-fixas'),
+  fixas: $('#tela-fixas'), fxLista: $('#fx-lista'), fxVoltar: $('#fx-voltar'),
+  fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes')
 };
 
 var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
@@ -33,7 +36,11 @@ var itens = [];
 var canal = null;
 var editando = false;
 var renderPendente = false;
-var paraApagar = null;      // lançamento aguardando confirmação de exclusão
+var paraApagar = null;      // item aguardando confirmação de exclusão
+var tipoApagar = 'lancamento';
+var modoFolha = 'lancamento';   // a folha de "+" serve às duas telas
+var modelos = [];               // contas fixas
+var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo';
 
 /* ---------- datas e dinheiro ---------- */
 
@@ -110,8 +117,8 @@ el.formLogin.addEventListener('submit', async function (ev) {
 el.btnSair.addEventListener('click', async function () {
   if (canal) { db.removeChannel(canal); canal = null; }
   await db.auth.signOut();
-  eu = null; itens = []; comp = mesDeHoje();
-  el.mes.hidden = true; el.login.hidden = false;
+  eu = null; itens = []; modelos = []; comp = mesDeHoje();
+  el.mes.hidden = true; el.fixas.hidden = true; el.login.hidden = false;
 });
 
 /* ---------- carregar ---------- */
@@ -197,6 +204,8 @@ function desenhar() {
     ? '1 conta em aberto, sem valor'
     : semValor + ' contas em aberto, sem valor';
 
+  atualizarBotaoGerar();
+
   el.lista.textContent = '';
   if (itens.length === 0) {
     var vazio = document.createElement('p');
@@ -216,6 +225,35 @@ function desenhar() {
       el.lista.appendChild(h);
     }
     el.lista.appendChild(linha(it));
+  });
+}
+
+// Um toque faz a ação principal; segurar 0,7 s faz a destrutiva.
+// Rolar a lista cancela: dedo que anda mais de 10 px não é dedo parado.
+function ligarToques(div, aoTocar, aoSegurar) {
+  var relogio = null, longo = false, x0 = 0, y0 = 0;
+  function soltar() {
+    clearTimeout(relogio); relogio = null;
+    div.className = div.className.replace(' segurando', '');
+  }
+  div.addEventListener('pointerdown', function (ev) {
+    longo = false; x0 = ev.clientX || 0; y0 = ev.clientY || 0;
+    div.className += ' segurando';
+    relogio = setTimeout(function () {
+      longo = true; soltar();
+      if (navigator.vibrate) navigator.vibrate(18);
+      aoSegurar();
+    }, 700);   // 0,7 s: longo o bastante para não apagar sem querer
+  });
+  div.addEventListener('pointermove', function (ev) {
+    if (Math.abs((ev.clientX || 0) - x0) > 10 || Math.abs((ev.clientY || 0) - y0) > 10) soltar();
+  });
+  div.addEventListener('pointerup', soltar);
+  div.addEventListener('pointercancel', soltar);
+  div.addEventListener('pointerleave', soltar);
+  div.addEventListener('click', function () {
+    if (longo) { longo = false; return; }   // já virou exclusão
+    aoTocar();
   });
 }
 
@@ -253,33 +291,7 @@ function linha(it) {
   // segurar o dedo no valor não pode apagar a conta
   valor.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
 
-  // Um toque marca ou desmarca, sem confirmação. Segurar apaga, com confirmação:
-  // marcar pago se desfaz com outro toque, apagar não se desfaz.
-  var relogio = null, longo = false, x0 = 0, y0 = 0;
-  function soltar() {
-    clearTimeout(relogio); relogio = null;
-    div.className = div.className.replace(' segurando', '');
-  }
-  div.addEventListener('pointerdown', function (ev) {
-    longo = false; x0 = ev.clientX || 0; y0 = ev.clientY || 0;
-    div.className += ' segurando';
-    relogio = setTimeout(function () {
-      longo = true; soltar();
-      if (navigator.vibrate) navigator.vibrate(18);
-      pedirApagar(it);
-    }, 700);   // 0,7 s: longo o bastante para nao apagar sem querer
-  });
-  div.addEventListener('pointermove', function (ev) {
-    // rolar a lista não é segurar
-    if (Math.abs((ev.clientX || 0) - x0) > 10 || Math.abs((ev.clientY || 0) - y0) > 10) soltar();
-  });
-  div.addEventListener('pointerup', soltar);
-  div.addEventListener('pointercancel', soltar);
-  div.addEventListener('pointerleave', soltar);
-  div.addEventListener('click', function () {
-    if (longo) { longo = false; return; }   // já virou exclusão, não marca pago
-    alternarPago(it);
-  });
+  ligarToques(div, function () { alternarPago(it); }, function () { pedirApagar(it, 'lancamento'); });
 
   div.appendChild(marca);
   div.appendChild(corpo);
@@ -357,8 +369,9 @@ function editarValor(it, botao) {
 
 /* ---------- apagar ---------- */
 
-function pedirApagar(it) {
+function pedirApagar(it, tipo) {
   paraApagar = it;
+  tipoApagar = tipo || 'lancamento';
   el.apDesc.textContent = it.descricao;
   el.fundoApagar.hidden = false;
   el.folhaApagar.hidden = false;
@@ -372,9 +385,19 @@ el.apCancelar.addEventListener('click', fecharApagar);
 el.fundoApagar.addEventListener('click', fecharApagar);
 
 el.apConfirmar.addEventListener('click', async function () {
-  var it = paraApagar;
+  var it = paraApagar, tipo = tipoApagar;
   if (!it) return;
   fecharApagar();
+
+  if (tipo === 'modelo') {
+    var guardaM = modelos.slice();
+    modelos = modelos.filter(function (x) { return x.id !== it.id; });
+    desenharFixas();
+    var rm = await db.from('modelo').delete().eq('id', it.id);
+    if (rm.error) { modelos = guardaM; desenharFixas(); aviso('Não deu para apagar. ' + rm.error.message); }
+    return;
+  }
+
   var guardado = itens.slice();
   itens = itens.filter(function (x) { return x.id !== it.id; });
   desenhar();
@@ -387,6 +410,157 @@ el.apConfirmar.addEventListener('click', async function () {
     cacheGravar();
   }
 });
+
+/* ---------- contas fixas ---------- */
+
+async function carregarModelos() {
+  var r = await db.from('modelo').select(COLUNAS_MODELO)
+            .order('dia_vencimento', { ascending: true })
+            .order('descricao', { ascending: true });
+  if (r.error) { aviso('Não consegui carregar as contas fixas. ' + r.error.message); return; }
+  modelos = r.data;
+}
+
+// Fixas ligadas que ainda não estão no mês na tela. A comparação é por
+// descrição, igual à do banco, para não oferecer o que a pessoa já digitou.
+function faltandoNoMes() {
+  var tem = {};
+  itens.forEach(function (i) { tem[i.descricao.trim().toLowerCase()] = 1; });
+  return modelos.filter(function (m) {
+    return m.ativo && !tem[m.descricao.trim().toLowerCase()];
+  });
+}
+
+function atualizarBotaoGerar() {
+  var faltam = faltandoNoMes().length;
+  el.btnGerar.hidden = faltam === 0;
+  el.btnGerar.textContent = faltam === 1
+    ? 'Trazer 1 conta fixa para este mês'
+    : 'Trazer ' + faltam + ' contas fixas para este mês';
+}
+
+el.btnGerar.addEventListener('click', async function () {
+  el.btnGerar.disabled = true;
+  var r = await db.rpc('gerar_mes', { p_competencia: comp });
+  el.btnGerar.disabled = false;
+  if (r.error) { aviso('Não deu para gerar. ' + r.error.message); return; }
+  await carregarMes();
+  aviso(r.data === 1 ? '1 conta trazida.' : r.data + ' contas trazidas.');
+});
+
+function mostrarTela(nome) {
+  el.mes.hidden = nome !== 'mes';
+  el.fixas.hidden = nome !== 'fixas';
+}
+el.btnFixas.addEventListener('click', async function () {
+  mostrarTela('fixas');
+  await carregarModelos();
+  desenharFixas();
+});
+el.fxVoltar.addEventListener('click', function () {
+  mostrarTela('mes');
+  desenhar();
+});
+
+el.fxDoMes.addEventListener('click', async function () {
+  el.fxDoMes.disabled = true;
+  var r = await db.rpc('fixar_mes', { p_competencia: comp });
+  el.fxDoMes.disabled = false;
+  if (r.error) { aviso('Não deu certo. ' + r.error.message); return; }
+  await carregarModelos();
+  await carregarMes();
+  desenharFixas();
+  aviso(r.data === 1 ? '1 conta virou fixa.' : r.data + ' contas viraram fixas.');
+});
+
+function desenharFixas() {
+  el.fxDoMes.hidden = itens.length === 0;
+  el.fxDoMes.textContent = 'Transformar as contas do mês em fixas';
+
+  el.fxLista.textContent = '';
+  if (modelos.length === 0) {
+    var vazio = document.createElement('p');
+    vazio.className = 'vazio-mes';
+    vazio.textContent = 'Nenhuma conta fixa ainda. Use o botão abaixo para '
+      + 'transformar as contas do mês em fixas de uma vez.';
+    el.fxLista.appendChild(vazio);
+    return;
+  }
+  modelos.forEach(function (m) { el.fxLista.appendChild(linhaModelo(m)); });
+}
+
+function linhaModelo(m) {
+  var div = document.createElement('div');
+  div.className = 'item' + (m.ativo ? '' : ' desligado');
+
+  var marca = document.createElement('div');
+  marca.className = 'marca';
+  marca.textContent = m.ativo ? '✓' : '';
+  if (m.ativo) marca.className += ' aceso';
+
+  var corpo = document.createElement('div');
+  corpo.className = 'corpo';
+  var desc = document.createElement('div');
+  desc.className = 'desc';
+  desc.textContent = m.descricao;
+  corpo.appendChild(desc);
+  var dia = document.createElement('div');
+  dia.className = 'fx-dia';
+  dia.textContent = 'todo dia ' + m.dia_vencimento;
+  corpo.appendChild(dia);
+
+  var valor = document.createElement('button');
+  valor.type = 'button';
+  valor.className = 'valor' + (m.valor_padrao == null ? ' vazio' : '');
+  valor.innerHTML = m.valor_padrao == null ? '???' : '<i>R$</i> ' + reais(m.valor_padrao);
+  valor.addEventListener('click', function (ev) { ev.stopPropagation(); editarPadrao(m, valor); });
+  valor.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+
+  ligarToques(div, function () { alternarAtivo(m); },
+                   function () { pedirApagar(m, 'modelo'); });
+
+  div.appendChild(marca);
+  div.appendChild(corpo);
+  div.appendChild(valor);
+  return div;
+}
+
+async function alternarAtivo(m) {
+  var antes = m.ativo;
+  m.ativo = !m.ativo;
+  desenharFixas();
+  var r = await db.from('modelo').update({ ativo: m.ativo }).eq('id', m.id);
+  if (r.error) { m.ativo = antes; desenharFixas(); aviso('Não deu para salvar. ' + r.error.message); }
+}
+
+function editarPadrao(m, botao) {
+  editando = true;
+  var inp = document.createElement('input');
+  inp.type = 'text'; inp.inputMode = 'decimal'; inp.className = 'editando';
+  inp.placeholder = '???';
+  inp.value = m.valor_padrao == null ? '' : reais(m.valor_padrao);
+  botao.replaceWith(inp);
+  inp.focus(); inp.select();
+  var terminou = false;
+  async function salvar() {
+    if (terminou) return;
+    terminou = true;
+    var n = paraNumero(inp.value);
+    editando = false;
+    if (typeof n === 'number' && isNaN(n)) { aviso('Não entendi esse valor.'); desenharFixas(); return; }
+    if (n === m.valor_padrao) { desenharFixas(); return; }
+    var antes = m.valor_padrao;
+    m.valor_padrao = n;
+    desenharFixas();
+    var r = await db.from('modelo').update({ valor_padrao: n }).eq('id', m.id);
+    if (r.error) { m.valor_padrao = antes; desenharFixas(); aviso('Não deu para salvar. ' + r.error.message); }
+  }
+  inp.addEventListener('blur', salvar);
+  inp.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); inp.blur(); }
+    if (ev.key === 'Escape') { terminou = true; editando = false; desenharFixas(); }
+  });
+}
 
 /* ---------- navegar entre meses ---------- */
 
@@ -404,7 +578,9 @@ el.mesNome.addEventListener('click', function () {
 
 /* ---------- conta avulsa ---------- */
 
-function abrirFolha() {
+function abrirFolha(modo) {
+  modoFolha = modo || 'lancamento';
+  el.adTitulo.textContent = modoFolha === 'modelo' ? 'Nova conta fixa' : 'Nova conta';
   el.adDesc.value = '';
   el.adDia.value = '';
   el.adValor.value = '';
@@ -417,7 +593,8 @@ function fecharFolha() {
   el.fundoAdd.hidden = true;
   el.folhaAdd.hidden = true;
 }
-el.btnAdd.addEventListener('click', abrirFolha);
+el.btnAdd.addEventListener('click', function () { abrirFolha('lancamento'); });
+el.fxAdd.addEventListener('click', function () { abrirFolha('modelo'); });
 el.adCancelar.addEventListener('click', fecharFolha);
 el.fundoAdd.addEventListener('click', fecharFolha);
 
@@ -430,6 +607,20 @@ el.folhaAdd.addEventListener('submit', async function (ev) {
   if (!desc) { el.erroAdd.textContent = 'Falta a descrição.'; el.erroAdd.hidden = false; return; }
   if (!(dia >= 1 && dia <= 31)) { el.erroAdd.textContent = 'O dia tem que ser entre 1 e 31.'; el.erroAdd.hidden = false; return; }
   if (typeof val === 'number' && isNaN(val)) { el.erroAdd.textContent = 'Não entendi esse valor.'; el.erroAdd.hidden = false; return; }
+
+  if (modoFolha === 'modelo') {
+    var rm = await db.from('modelo').insert({
+      casa_id: eu.casa_id, descricao: desc, dia_vencimento: dia, valor_padrao: val
+    }).select(COLUNAS_MODELO).single();
+    if (rm.error) { el.erroAdd.textContent = rm.error.message; el.erroAdd.hidden = false; return; }
+    fecharFolha();
+    modelos.push(rm.data);
+    modelos.sort(function (a, b) {
+      return a.dia_vencimento - b.dia_vencimento || a.descricao.localeCompare(b.descricao, 'pt-BR');
+    });
+    desenharFixas();
+    return;
+  }
 
   var r = await db.from('lancamento').insert({
     casa_id: eu.casa_id, competencia: comp, descricao: desc,
@@ -457,6 +648,7 @@ async function abrirApp() {
     await db.auth.signOut().catch(function () {});
     eu = null;
     el.mes.hidden = true;
+    el.fixas.hidden = true;
     el.login.hidden = false;
     aviso(e.message || 'Sua sessão expirou. Entre de novo.');
     return;
@@ -464,6 +656,8 @@ async function abrirApp() {
   el.login.hidden = true;
   el.mes.hidden = false;
   comp = mesDeHoje();
+  mostrarTela('mes');
+  await carregarModelos();
   await carregarMes();
   ligarTempoReal();
 }
