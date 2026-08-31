@@ -158,8 +158,10 @@ avancarTempo(2000);
 medir('toque curto NAO abre a confirmacao', q('#folha-apagar').hidden, true);
 
 alvoD.disparar('pointerdown');
-avancarTempo(500);
-medir('segurar abriu a confirmacao', q('#folha-apagar').hidden, false);
+avancarTempo(699);
+medir('meio segundo AINDA nao abre', q('#folha-apagar').hidden, true);
+avancarTempo(700);
+medir('segurar 0,7s abriu a confirmacao', q('#folha-apagar').hidden, false);
 medir('diz qual conta', q('#ap-desc')._txt, descD);
 
 // o clique que o navegador manda depois do toque longo nao pode marcar pago

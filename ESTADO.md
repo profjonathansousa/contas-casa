@@ -84,7 +84,7 @@ Decisões tomadas no caminho:
 ## Provas rodadas
 
 `./testes/rodar.sh` — roda o `app.js` e o `sw.js` reais no `jsc` com o mundo
-em volta falsificado. Placar: **54 / 4 / 11 medidas, 0 falhas.**
+em volta falsificado. Placar: **55 / 4 / 11 medidas, 0 falhas.**
 
 A bancada lê o `index.html` real para saber quais elementos nascem escondidos.
 Um controle negativo pegou exatamente esse erro: com os elementos nascendo

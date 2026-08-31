@@ -267,7 +267,7 @@ function linha(it) {
       longo = true; soltar();
       if (navigator.vibrate) navigator.vibrate(18);
       pedirApagar(it);
-    }, 500);
+    }, 700);   // 0,7 s: longo o bastante para nao apagar sem querer
   });
   div.addEventListener('pointermove', function (ev) {
     // rolar a lista não é segurar

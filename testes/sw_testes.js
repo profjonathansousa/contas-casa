@@ -9,17 +9,17 @@ print('\n== install: guarda a casca do app ==');
 var esperou = null;
 disparar('install', { waitUntil: function (p) { esperou = p; } });
 esperar();
-var caixa = GUARDADO['nossas-contas-v1'] || {};
+var caixa = GUARDADO['nossas-contas-v2'] || {};
 medir('arquivos guardados', Object.keys(caixa).length, 11);
 medir('guardou o app.js', !!caixa['./app.js'], true);
 medir('guardou a biblioteca', !!caixa['./vendor/supabase.js'], true);
 medir('guardou o icone maskable', !!caixa['./icones/icone-maskable-512.png'], true);
 
 print('\n== activate: apaga versao velha ==');
-GUARDADO['nossas-contas-v0'] = { velho: 1 };
+GUARDADO['nossas-contas-v1'] = { velho: 1 };
 disparar('activate', { waitUntil: function (p) { esperou = p; } });
 esperar();
-medir('caches restantes', Object.keys(GUARDADO), ['nossas-contas-v1']);
+medir('caches restantes', Object.keys(GUARDADO), ['nossas-contas-v2']);
 
 print('\n== fetch: o Supabase passa direto, sem cache ==');
 var respondeu;

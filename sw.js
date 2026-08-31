@@ -2,7 +2,7 @@
    Guarda só os arquivos do próprio app. Nada do Supabase é cacheado — dado de
    conta tem que vir do servidor, senão a tela mente. Fila offline é fase 2. */
 
-var VERSAO = 'nossas-contas-v1';
+var VERSAO = 'nossas-contas-v2';
 var CASCA = [
   './', './index.html', './app.css', './app.js', './config.js',
   './vendor/supabase.js', './manifest.webmanifest',

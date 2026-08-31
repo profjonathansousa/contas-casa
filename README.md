@@ -53,7 +53,7 @@ do mês volta para o mês corrente.
 ```
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS),
-com DOM, relógio e Supabase falsos. Tem que fechar em 54 / 4 / 11 medidas e
+com DOM, relógio e Supabase falsos. Tem que fechar em 55 / 4 / 11 medidas e
 zero falhas.
 
 ## Modelo de dados
