@@ -106,6 +106,7 @@ button { border: 0; background: none; cursor: pointer; }
 /* ---------- lista ---------- */
 .lista { padding: 6px 10px 8px; }
 .rodape { padding: 18px 10px calc(110px + env(safe-area-inset-bottom)); text-align: center; }
+.dica { color: var(--fraco); font-size: 13.5px; margin: 0 0 6px; }
 .dia {
   font-size: 13px; font-weight: 700; color: var(--fraco);
   text-transform: uppercase; letter-spacing: .08em;
@@ -180,6 +181,12 @@ button { border: 0; background: none; cursor: pointer; }
   background: var(--verde); color: #fff;
 }
 .botoes .secundario { background: var(--borda); color: var(--texto); }
+.botoes .perigo { background: var(--alerta); color: #fff; }
+.ap-desc { font-size: 20px; font-weight: 600; margin: 4px 0 0; }
+.ap-nota { font-size: 14.5px; color: var(--fraco); margin: 6px 0 0; }
+
+/* segurando o dedo: a conta afunda, para a pessoa ver que algo vai acontecer */
+.item.segurando { transform: scale(.97); background: var(--borda); }
 
 /* ---------- aviso ---------- */
 .aviso {

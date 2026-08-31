@@ -18,7 +18,9 @@ var el = {
   lista: $('#lista'), btnAdd: $('#btn-add'), btnSair: $('#btn-sair'),
   fundoAdd: $('#fundo-add'), folhaAdd: $('#folha-add'), adDesc: $('#ad-desc'),
   adDia: $('#ad-dia'), adValor: $('#ad-valor'), adCancelar: $('#ad-cancelar'),
-  erroAdd: $('#erro-add'), aviso: $('#aviso')
+  erroAdd: $('#erro-add'), aviso: $('#aviso'),
+  fundoApagar: $('#fundo-apagar'), folhaApagar: $('#folha-apagar'),
+  apDesc: $('#ap-desc'), apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar')
 };
 
 var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
@@ -31,6 +33,7 @@ var itens = [];
 var canal = null;
 var editando = false;
 var renderPendente = false;
+var paraApagar = null;      // lançamento aguardando confirmação de exclusão
 
 /* ---------- datas e dinheiro ---------- */
 
@@ -247,9 +250,36 @@ function linha(it) {
     ev.stopPropagation();          // tocar no valor edita; tocar no resto marca pago
     editarValor(it, valor);
   });
+  // segurar o dedo no valor não pode apagar a conta
+  valor.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
 
-  // um toque em qualquer outro ponto marca ou desmarca. Sem confirmação.
-  div.addEventListener('click', function () { alternarPago(it); });
+  // Um toque marca ou desmarca, sem confirmação. Segurar apaga, com confirmação:
+  // marcar pago se desfaz com outro toque, apagar não se desfaz.
+  var relogio = null, longo = false, x0 = 0, y0 = 0;
+  function soltar() {
+    clearTimeout(relogio); relogio = null;
+    div.className = div.className.replace(' segurando', '');
+  }
+  div.addEventListener('pointerdown', function (ev) {
+    longo = false; x0 = ev.clientX || 0; y0 = ev.clientY || 0;
+    div.className += ' segurando';
+    relogio = setTimeout(function () {
+      longo = true; soltar();
+      if (navigator.vibrate) navigator.vibrate(18);
+      pedirApagar(it);
+    }, 500);
+  });
+  div.addEventListener('pointermove', function (ev) {
+    // rolar a lista não é segurar
+    if (Math.abs((ev.clientX || 0) - x0) > 10 || Math.abs((ev.clientY || 0) - y0) > 10) soltar();
+  });
+  div.addEventListener('pointerup', soltar);
+  div.addEventListener('pointercancel', soltar);
+  div.addEventListener('pointerleave', soltar);
+  div.addEventListener('click', function () {
+    if (longo) { longo = false; return; }   // já virou exclusão, não marca pago
+    alternarPago(it);
+  });
 
   div.appendChild(marca);
   div.appendChild(corpo);
@@ -324,6 +354,39 @@ function editarValor(it, botao) {
     if (ev.key === 'Escape') { terminou = true; fechar(); }
   });
 }
+
+/* ---------- apagar ---------- */
+
+function pedirApagar(it) {
+  paraApagar = it;
+  el.apDesc.textContent = it.descricao;
+  el.fundoApagar.hidden = false;
+  el.folhaApagar.hidden = false;
+}
+function fecharApagar() {
+  paraApagar = null;
+  el.fundoApagar.hidden = true;
+  el.folhaApagar.hidden = true;
+}
+el.apCancelar.addEventListener('click', fecharApagar);
+el.fundoApagar.addEventListener('click', fecharApagar);
+
+el.apConfirmar.addEventListener('click', async function () {
+  var it = paraApagar;
+  if (!it) return;
+  fecharApagar();
+  var guardado = itens.slice();
+  itens = itens.filter(function (x) { return x.id !== it.id; });
+  desenhar();
+  var r = await db.from('lancamento').delete().eq('id', it.id);
+  if (r.error) {
+    itens = guardado;
+    desenhar();
+    aviso('Não deu para apagar. ' + r.error.message);
+  } else {
+    cacheGravar();
+  }
+});
 
 /* ---------- navegar entre meses ---------- */
 

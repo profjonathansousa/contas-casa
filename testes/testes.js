@@ -143,5 +143,47 @@ LOG.canais[0].fn({ eventType: 'UPDATE', new: {
   pago_em: null, pago_por: null } });
 medir('item de outro mes NAO entrou', itensDesenhados().length, nItens);
 
+print('\n== 12. segurar apaga; toque curto nao ==');
+function descricoes() {
+  return itensDesenhados().map(function (d) { return d.filhos[1].filhos[0]._txt; });
+}
+var alvoD = itensDesenhados()[1];
+var descD = descricoes()[1];
+var idEsperado = BANCO.filter(function (x) { return x.descricao === descD; })[0].id;
+
+// CONTROLE: soltar antes do tempo nao pode abrir nada
+alvoD.disparar('pointerdown');
+alvoD.disparar('pointerup');
+avancarTempo(2000);
+medir('toque curto NAO abre a confirmacao', q('#folha-apagar').hidden, true);
+
+alvoD.disparar('pointerdown');
+avancarTempo(500);
+medir('segurar abriu a confirmacao', q('#folha-apagar').hidden, false);
+medir('diz qual conta', q('#ap-desc')._txt, descD);
+
+// o clique que o navegador manda depois do toque longo nao pode marcar pago
+var upAntes = LOG.updates.length;
+alvoD.disparar('click');
+esperar();
+medir('nao marcou pago junto', LOG.updates.length - upAntes, 0);
+
+var antesD = descricoes();
+q('#ap-confirmar').disparar('click');
+esperar();
+medir('delete enviado', LOG.deletes.length, 1);
+medir('id certo', LOG.deletes[0].id, idEsperado);
+var depoisD = descricoes();
+medir('sumiu exatamente a que eu segurei',
+      antesD.filter(function (d) { return depoisD.indexOf(d) < 0; }), [descD]);
+medir('confirmacao fechou', q('#folha-apagar').hidden, true);
+
+// CONTROLE: rolar a lista (dedo se move) nao pode apagar
+var outro = itensDesenhados()[1];
+outro.disparar('pointerdown');
+outro.disparar('pointermove', { clientX: 0, clientY: 90, preventDefault: function(){}, stopPropagation: function(){} });
+avancarTempo(2000);
+medir('rolar a lista NAO abre a confirmacao', q('#folha-apagar').hidden, true);
+
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

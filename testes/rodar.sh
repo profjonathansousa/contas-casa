@@ -5,13 +5,14 @@ set -e
 AQUI="${0:A:h}"; APP="$AQUI/.."
 JSC=/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc
 T=$(mktemp -d)
+echo "var DIR_APP = '$APP';" > "$T/dir.js"
 
-cat "$AQUI/prelude.js" "$APP/app.js" "$AQUI/testes.js" > "$T/a.js"
+cat "$T/dir.js" "$AQUI/prelude.js" "$APP/app.js" "$AQUI/testes.js" > "$T/a.js"
 "$JSC" "$T/a.js"
 
 sed "s|return { data: \[ { id: ID_EU, casa_id: CASA, nome: 'Jonathan' },|return { data: [ { id: 'nao-e-voce', casa_id: CASA, nome: 'Jonathan' },|" \
   "$AQUI/prelude.js" > "$T/p2.js"
-cat "$T/p2.js" "$APP/app.js" "$AQUI/teste_semperfil.js" > "$T/b.js"
+cat "$T/dir.js" "$T/p2.js" "$APP/app.js" "$AQUI/teste_semperfil.js" > "$T/b.js"
 "$JSC" "$T/b.js"
 
 cat "$AQUI/sw_prelude.js" "$APP/sw.js" "$AQUI/sw_testes.js" > "$T/c.js"

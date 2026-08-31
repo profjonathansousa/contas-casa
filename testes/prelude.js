@@ -1,6 +1,6 @@
 /* Bancada: DOM e Supabase falsos. Nada da logica do app e reimplementado --
    o app.js real roda em cima disto. */
-var LOG = { selects: [], updates: [], inserts: [], canais: [] };
+var LOG = { selects: [], updates: [], inserts: [], deletes: [], canais: [] };
 
 function Elem(tag) {
   this.tag = tag; this.filhos = []; this.hs = {}; this._txt = ''; this._html = '';
@@ -38,6 +38,17 @@ var document = {
 var _ap = Elem.prototype.appendChild;
 Elem.prototype.appendChild = function (c) { c.pai = this; return _ap.call(this, c); };
 
+// A bancada TEM que comecar no estado em que a pagina real comeca. Elemento
+// que nasce com "hidden" no index.html nasce escondido aqui tambem -- senao uma
+// medicao passa pelo motivo errado.
+(function () {
+  var html = readFile(DIR_APP + '/index.html');
+  var re = /id="([^"]+)"[^>]*\shidden/g, m;
+  var n = 0;
+  while ((m = re.exec(html))) { document.querySelector('#' + m[1]).hidden = true; n++; }
+  if (n < 5) throw new Error('bancada nao leu o index.html: so ' + n + ' elementos escondidos');
+})();
+
 var window = { addEventListener: function () {}, CONFIG: { URL: 'http://x', ANON: 'k' } };
 var navigator = {};
 var localStorage = (function () {
@@ -46,7 +57,15 @@ var localStorage = (function () {
            setItem: function (k, v) { m[k] = String(v); },
            removeItem: function (k) { delete m[k]; } };
 })();
-function setTimeout(f) { return 0; } function clearTimeout() {}
+// Relogio controlavel: o toque longo so pode ser medido se eu mandar no tempo.
+var TEMPOS = [], PROX_ID = 1;
+function setTimeout(f, ms) { var id = PROX_ID++; TEMPOS.push({ id: id, f: f, quando: ms || 0 }); return id; }
+function clearTimeout(id) { TEMPOS = TEMPOS.filter(function (t) { return t.id !== id; }); }
+function avancarTempo(ms) {
+  var venceu = TEMPOS.filter(function (t) { return t.quando <= ms; });
+  TEMPOS = TEMPOS.filter(function (t) { return t.quando > ms; });
+  venceu.forEach(function (t) { t.f(); });
+}
 
 /* ----- dados fixos da bancada (ficticios) ----- */
 var MES = (function () { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01'; })();
@@ -119,6 +138,12 @@ var supabase = {
               if (obj.pago === false) { d.pago_em = null; d.pago_por = null; }
               return { data: d, error: null };
             });
+            return t;
+          },
+          'delete': function () {
+            var reg = { tabela: tabela };
+            LOG.deletes.push(reg);
+            var t = thenable(function () { reg.id = t._eq && t._eq.id; return { error: null }; });
             return t;
           },
           insert: function (obj) {

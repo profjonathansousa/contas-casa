@@ -48,6 +48,7 @@
 
   <div id="lista" class="lista"></div>
   <footer class="rodape">
+    <p class="dica">Segure uma conta para apagar.</p>
     <button id="btn-sair" class="sair">sair</button>
   </footer>
 
@@ -76,6 +77,18 @@
   </div>
   <p id="erro-add" class="erro" hidden></p>
 </form>
+
+<!-- ---------- apagar ---------- -->
+<div id="fundo-apagar" class="fundo" hidden></div>
+<div id="folha-apagar" class="folha" hidden>
+  <h2>Apagar esta conta?</h2>
+  <p id="ap-desc" class="ap-desc"></p>
+  <p class="ap-nota">Some para os dois, e não dá para desfazer.</p>
+  <div class="botoes">
+    <button type="button" id="ap-cancelar" class="secundario">Cancelar</button>
+    <button type="button" id="ap-confirmar" class="perigo">Apagar</button>
+  </div>
+</div>
 
 <div id="aviso" class="aviso" hidden></div>
 

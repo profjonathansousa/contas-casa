@@ -84,7 +84,11 @@ Decisões tomadas no caminho:
 ## Provas rodadas
 
 `./testes/rodar.sh` — roda o `app.js` e o `sw.js` reais no `jsc` com o mundo
-em volta falsificado. Placar: **45 / 4 / 11 medidas, 0 falhas.**
+em volta falsificado. Placar: **54 / 4 / 11 medidas, 0 falhas.**
+
+A bancada lê o `index.html` real para saber quais elementos nascem escondidos.
+Um controle negativo pegou exatamente esse erro: com os elementos nascendo
+visíveis, o teste do toque curto passava pelo motivo errado.
 
 No navegador, servindo em 127.0.0.1:
 | medição | resultado |
@@ -108,9 +112,11 @@ No navegador, servindo em 127.0.0.1:
 
 - Os nove lançamentos são o seed fictício. Apagar com
   `delete from public.lancamento where observacao = 'seed';`
-- **Não há como apagar um lançamento pela tela.** "Excluir" não estava na lista
-  dos 12 itens desta fase e eu não ampliei o escopo por conta própria. Uma conta
-  digitada errada só sai pelo SQL. Decisão de Jonathan.
+- ~~Não há como apagar um lançamento pela tela.~~ **Feito em 31/08/2026,** a
+  pedido de Jonathan: segurar o dedo na linha por meio segundo abre a
+  confirmação. Toque curto e rolagem não disparam (medido). A política
+  `lancamento_apagar` foi provada no banco: eu apago 1 na minha casa, um
+  estranho tentando apagar o mês inteiro remove 0.
 
 ## PRÓXIMA AÇÃO EXATA
 

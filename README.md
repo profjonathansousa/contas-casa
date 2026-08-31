@@ -27,14 +27,34 @@ CONTAS_CASA/
 │   ├── 01_schema_rls.sql      schema + RLS (rodar uma vez)
 │   ├── 02_config_inicial.sql  modelo: cria a casa e os dois perfis
 │   └── 03_seed_ficticio.sql   dados de mentira, opcional, só para ver a tela
-├── icones/                    ícones do PWA
-├── index.html                 (fase 1, ainda não escrito)
-├── app.css                    (fase 1, ainda não escrito)
-├── app.js                     (fase 1, ainda não escrito)
-├── config.js                  (fase 1) URL do projeto + anon key
-├── manifest.webmanifest       (fase 1)
-└── sw.js                      (fase 1) service worker mínimo
+├── icones/                    ícones do PWA (gerados, 4 PNGs)
+├── testes/                    bancada: roda app.js e sw.js reais no jsc
+├── vendor/supabase.js         supabase-js 2.112.4 (UMD), versionado de propósito
+├── index.html
+├── app.css
+├── app.js
+├── config.js                  URL do projeto + anon key
+├── manifest.webmanifest
+└── sw.js                      service worker mínimo
 ```
+
+## Como se usa
+
+Um toque em qualquer ponto da linha **marca ou desmarca pago**, sem confirmação
+— o toque de volta desfaz. Um toque no valor **edita o valor**. Segurar o dedo
+na linha **apaga a conta**, e esse pede confirmação, porque apagar não se
+desfaz. O `+` adiciona uma conta avulsa ao mês que está na tela. Tocar no nome
+do mês volta para o mês corrente.
+
+## Testes
+
+```
+./testes/rodar.sh
+```
+
+Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS),
+com DOM, relógio e Supabase falsos. Tem que fechar em 54 / 4 / 11 medidas e
+zero falhas.
 
 ## Modelo de dados
 
@@ -75,7 +95,8 @@ mandar só `pago = true` e o selo de autoria não poder ser forjado.
 agrupada por dia de vencimento; toque único marca e desmarca pago; sync em
 tempo real; selo "pago por fulano, 14:32"; cabeçalho fixo com previsto / pago /
 a pagar e a contagem de itens em aberto sem valor; editar valor; adicionar
-conta avulsa; navegar entre meses; PWA instalável.
+conta avulsa; apagar conta segurando o dedo; navegar entre meses; PWA
+instalável.
 
 **Fase 2** — Web Push com VAPID, bot do Telegram como redundância, GitHub
 Actions com cron diário, offline com IndexedDB e fila de pendências.
