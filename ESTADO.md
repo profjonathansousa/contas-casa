@@ -17,6 +17,8 @@ Atualizado em 30/08/2026 — fim do bloco 1 (fundação).
   partir dos e-mails de login.
 - `sql/03_seed_ficticio.sql` — nove lançamentos de mentira, dois deles sem
   valor previsto, para testar a tela antes de digitar conta de verdade.
+- `sql/04_prova_rls.sql` — prova a RLS fingindo ser um usuário autenticado,
+  com controle negativo (um id sem perfil tem que enxergar zero).
 
 ## O que falta na fase 1
 
@@ -42,8 +44,8 @@ Nada de frontend foi escrito ainda. Falta, na ordem:
 
 Jonathan precisa fazer os passos manuais no painel do Supabase (criar o
 projeto, rodar `sql/01_schema_rls.sql`, criar os dois usuários, rodar a versão
-preenchida do `sql/02_config_inicial.sql`, e copiar a URL do projeto e a
-`anon key`).
+preenchida do `sql/02_config_inicial.sql`, rodar o `sql/04_prova_rls.sql` e
+conferir que a medição 2 volta zero, e copiar a URL do projeto e a `anon key`).
 
 Quando ele confirmar que o banco está de pé e passar a URL e a `anon key`,
 começar pelo item 1 da lista acima e seguir até o 12.
