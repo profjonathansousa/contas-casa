@@ -1,0 +1,11 @@
+# segredos e configuração de máquina
+.env
+.env.*
+*.local.*
+
+# dados reais — nunca versionar
+/dados/
+/backup/
+
+# lixo do sistema
+.DS_Store
