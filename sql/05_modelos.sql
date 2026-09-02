@@ -31,8 +31,12 @@ exception when duplicate_object then null;
 end $$;
 
 create or replace function public.tg_modelo()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = public
+as $$
 begin new.atualizado_em := now(); return new; end $$;
+
+revoke all on function public.tg_modelo() from public, anon, authenticated;
 
 drop trigger if exists modelo_antes_de_gravar on public.modelo;
 create trigger modelo_antes_de_gravar

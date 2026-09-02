@@ -66,7 +66,11 @@ as $$
   select casa_id from public.perfil where id = auth.uid()
 $$;
 
-revoke all on function public.minha_casa() from public;
+-- O revoke precisa nomear anon: o Supabase concede EXECUTE a anon e a
+-- authenticated por default privileges, e "revoke from public" NÃO tira
+-- essas concessões nominais. Sem isto, minha_casa() fica chamável sem login
+-- em /rest/v1/rpc/minha_casa.
+revoke all on function public.minha_casa() from public, anon;
 grant execute on function public.minha_casa() to authenticated;
 
 -- Data de vencimento real: dia pedido, limitado ao último dia do mês.
@@ -75,6 +79,7 @@ create or replace function public.calc_vencimento(comp date, dia int)
 returns date
 language sql
 immutable
+set search_path = public
 as $$
   select comp + (
     least(dia, extract(day from (comp + interval '1 month' - interval '1 day'))::int) - 1
@@ -101,9 +106,12 @@ begin
   if tg_op = 'INSERT' then
     new.criado_em     := now();
     new.atualizado_em := now();
+    -- Sem coalesce: com ele, um INSERT podia chegar com pago_em e pago_por
+    -- escolhidos a dedo e assinar a conta como se fosse o outro morador.
+    -- Quem assina é o banco, no INSERT e no UPDATE.
     if new.pago then
-      new.pago_em  := coalesce(new.pago_em, now());
-      new.pago_por := coalesce(new.pago_por, auth.uid());
+      new.pago_em  := now();
+      new.pago_por := auth.uid();
     else
       new.pago_em  := null;
       new.pago_por := null;
@@ -128,6 +136,11 @@ begin
   return new;
 end
 $$;
+
+-- Função de trigger não é endpoint: sem este revoke ela aparece em
+-- /rest/v1/rpc/tg_lancamento como SECURITY DEFINER chamável por qualquer um.
+-- O gatilho continua disparando: o Postgres não exige EXECUTE de quem grava.
+revoke all on function public.tg_lancamento() from public, anon, authenticated;
 
 drop trigger if exists lancamento_antes_de_gravar on public.lancamento;
 create trigger lancamento_antes_de_gravar

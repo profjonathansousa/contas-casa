@@ -18,6 +18,14 @@ const SECO     = process.env.SECO === '1';
 
 if (!URL_BASE || !CHAVE) { console.error('Faltam SUPABASE_URL / SUPABASE_SERVICE_ROLE.'); process.exit(1); }
 
+// Sem isto, faltar uma chave VAPID derrubava o processo com um stack trace do
+// web-push, em vez de dizer qual Secret está faltando.
+const semVapid = [
+  ['VAPID_PUBLIC_KEY',  process.env.VAPID_PUBLIC_KEY],
+  ['VAPID_PRIVATE_KEY', process.env.VAPID_PRIVATE_KEY]
+].filter(([, valor]) => !valor).map(([nome]) => nome);
+if (semVapid.length) { console.error('Faltam: ' + semVapid.join(', ') + '.'); process.exit(1); }
+
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT || 'mailto:ninguem@exemplo.com',
   process.env.VAPID_PUBLIC_KEY,

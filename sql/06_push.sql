@@ -32,8 +32,12 @@ create policy push_ler    on public.push_inscricao for select to authenticated
   using (perfil_id = auth.uid());
 create policy push_criar  on public.push_inscricao for insert to authenticated
   with check (perfil_id = auth.uid() and casa_id = public.minha_casa());
+-- O with check repete o casa_id de propósito: sem ele, alguém podia apontar
+-- a própria inscrição para outra casa e passar a receber o resumo diário
+-- dela. O insert já cobrava isso; o update não cobrava.
 create policy push_editar on public.push_inscricao for update to authenticated
-  using (perfil_id = auth.uid()) with check (perfil_id = auth.uid());
+  using (perfil_id = auth.uid())
+  with check (perfil_id = auth.uid() and casa_id = public.minha_casa());
 create policy push_apagar on public.push_inscricao for delete to authenticated
   using (perfil_id = auth.uid());
 

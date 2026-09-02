@@ -1,6 +1,30 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 31/08/2026 — fim do bloco 5: notificação push. NO AR.
+Atualizado em 02/09/2026 — fim da fase 0: auditoria e estabilização. NO AR.
+
+## Em que grau cada coisa está de pé
+
+Três colunas diferentes, e a diferença importa: **implementado** é código
+escrito; **testado** é medido pela bancada ou pela prova de RLS no banco;
+**validado em produção** é alguém tendo usado aquilo num aparelho de verdade.
+A terceira coluna é a que quase sempre falta.
+
+| coisa | implementado | testado | validado em produção |
+|---|---|---|---|
+| login por e-mail e senha | sim | sim (senha errada, sessão sem perfil) | sim, só o Jonathan |
+| tela do mês, totais, agrupamento | sim | sim (81 medidas) | sim |
+| toque marca e desmarca pago | sim | sim | sim |
+| selo "pago por fulano" | sim | sim | sim |
+| editar valor, conta avulsa, apagar | sim | sim | sim |
+| navegar entre meses | sim | sim | sim |
+| contas fixas e gerar o mês | sim | sim (banco + bancada) | sim |
+| PWA instalável e service worker | sim | sim (23 medidas) | sim, no iPhone do Jonathan |
+| RLS isolando por casa | sim | sim (prova 04, com controle negativo) | sim |
+| **Realtime entre dois aparelhos** | sim | só o lado do app, com evento fabricado | **não** |
+| **Web Push: inscrever o aparelho** | sim | não (não dá para medir fora do navegador) | **sim: há 1 inscrição no banco** |
+| **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **não — nenhuma notificação chegou** |
+| **cron diário do aviso** | sim | não | **não — nunca rodou com o Secret posto** |
+| segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
 
@@ -20,9 +44,10 @@ Atualizado em 31/08/2026 — fim do bloco 5: notificação push. NO AR.
 - `sql/04_prova_rls.sql` — prova a RLS fingindo ser um usuário autenticado,
   com controle negativo (um id sem perfil tem que enxergar zero).
 
-## O que falta na fase 1
+## O que faltava na fase 1 (lista de 31/08, hoje toda cumprida)
 
-Nada de frontend foi escrito ainda. Falta, na ordem:
+Fica registrada como estava, para o histórico. Tudo isto foi feito no mesmo
+dia, e a fase 0 conferiu item por item no quadro lá em cima.
 
 1. `config.js` com a URL do projeto e a `anon key`
 2. Login por e-mail e senha (tela mínima, sessão persistida)
@@ -84,7 +109,8 @@ Decisões tomadas no caminho:
 ## Provas rodadas
 
 `./testes/rodar.sh` — roda o `app.js` e o `sw.js` reais no `jsc` com o mundo
-em volta falsificado. Placar: **55 / 4 / 11 medidas, 0 falhas.**
+em volta falsificado. Placar naquele dia: **55 / 4 / 11 medidas, 0 falhas.**
+(Depois dos blocos 4 e 5 virou 81 / 4 / 23 / 11, que é o placar de hoje.)
 
 A bancada lê o `index.html` real para saber quais elementos nascem escondidos.
 Um controle negativo pegou exatamente esse erro: com os elementos nascendo
@@ -241,12 +267,139 @@ gh secret set SUPABASE_SERVICE_ROLE -R profjonathansousa/contas-casa
 Bot do Telegram (a redundância) e offline com IndexedDB continuam por fazer.
 Controle de parcelas continua na fase 3.
 
+## Fase 0 — auditoria e estabilização (02/09/2026)
+
+Nenhuma funcionalidade nova. O trabalho foi olhar o que já existe, medir e
+tapar o que estava aberto.
+
+### A bancada podia estar vermelha e ninguém saber
+
+O `rodar.sh` saía com código **zero mesmo com medidas falhando** — o `jsc`
+termina bem, e os arquivos de teste só imprimem "FALHA" sem derrubar nada.
+Ou seja: qualquer CI ligado ali daria verde para bancada quebrada, que é pior
+do que não ter CI. Agora o `rodar.sh` confere três coisas e sai com erro em
+qualquer uma: medida falhando, motor morrendo, placar diferente de
+`81 / 4 / 23 / 11`. Conferido com controle negativo — injetei uma medida falsa,
+um `throw` e a remoção de uma medida, e as três ficaram vermelhas.
+
+O outro impedimento era o motor: o script só rodava no macOS, com o caminho
+fixo do `jsc`, em `#!/bin/zsh` e com expansão de caminho que só o zsh entende.
+Agora é `sh`, aguenta caminho com espaço (a pasta de trabalho está dentro do
+iCloud Drive, que tem) e, quando não acha o `jsc`, roda no `node` pela ponte de
+`testes/ponte_node.js`. A ponte repõe só `print`, `readFile` e
+`drainMicrotasks` — nada do app é fingido ali. Os dois motores rodam os mesmos
+arquivos e fecham no mesmo placar.
+
+### CI
+
+`.github/workflows/testes.yml`, novo: roda `./testes/rodar.sh` a cada push e a
+cada pull request. Separado do Web Push de propósito — não toca no banco, não
+manda notificação, não usa Secret nenhum e pede só `contents: read`.
+
+### avisos/ com npm ci
+
+`avisos/package-lock.json` gerado, travando `web-push` em **3.6.7** e mais 16
+pacotes indiretos, sem mudar nenhuma dependência. Os dois workflows do push
+passaram de `npm install` para `npm ci --ignore-scripts` (a árvore inteira não
+tem script de instalação, então isso não muda nada além de fechar a porta) e
+ganharam `permissions: contents: read`. `node_modules/` entrou no `.gitignore`.
+
+### Segurança — o que estava concretamente aberto
+
+Medido no projeto real pelo linter do Supabase, não por leitura de código:
+
+1. **`tg_lancamento()` assinava o que o cliente mandasse, no `insert`.** No
+   `update` o banco já forçava autor e hora; no `insert` havia `coalesce`, e um
+   `insert` com `pago = true`, `pago_por` do outro morador e `pago_em` de 2000
+   era gravado como veio. O README prometia que o selo não podia ser forjado;
+   agora é verdade nos dois caminhos. O seed e o `gerar_mes()` não mudam de
+   comportamento (inserem sem `pago`).
+2. **`minha_casa()` e `tg_lancamento()` chamáveis por quem não entrou.** Ambas
+   são `security definer` e apareciam em `/rest/v1/rpc/...` para o papel `anon`.
+   O `revoke ... from public` do script não bastava: o Supabase concede EXECUTE
+   nominalmente a `anon` e a `authenticated` por *default privileges*, e revogar
+   de `public` não tira concessão nominal. Agora os `revoke` nomeiam os papéis.
+   A trigger continua disparando: o Postgres cobra EXECUTE de quem cria o
+   gatilho, não de quem grava a linha.
+3. **`push_inscricao` deixava mudar de casa.** A política de `insert` cobrava
+   `casa_id = minha_casa()`; a de `update` não cobrava. Alguém podia apontar a
+   própria inscrição para outra casa e passar a receber o resumo diário dela —
+   precisaria adivinhar o uuid da casa, o que na prática não acontece, mas a
+   assimetria era real e o conserto é uma linha.
+4. **`calc_vencimento()` e `tg_modelo()` com `search_path` solto.** Aviso do
+   linter, risco baixo (são `security invoker`), corrigido no mesmo passo.
+5. **Cache de pintura sobrevivia ao "sair".** O `localStorage` guarda descrição
+   e valor das contas do mês para a tela aparecer antes da rede; o logout não
+   apagava. Agora apaga.
+
+Nenhum segredo foi acrescentado, e o histórico do repositório foi varrido:
+não há `.env`, nem chave de serviço, nem VAPID privada, nem dado financeiro em
+nenhum commit. A `anon key` e a VAPID pública no `config.js` são públicas por
+desenho e continuam onde estavam.
+
+**Os quatro consertos de SQL só valem depois de rodar de novo, no SQL Editor,
+os arquivos `sql/01_schema_rls.sql`, `sql/05_modelos.sql` e `sql/06_push.sql`.
+Os três são idempotentes. Enquanto isso não for feito, o banco em produção
+continua com os furos acima.**
+
+### Realtime e Web Push: o que a auditoria pode e não pode dizer
+
+Não foi criada nenhuma camada nova. O que existe é o que já existia: o canal
+`postgres_changes` filtrado por `casa_id` e o robô do Actions com `web-push`.
+
+O que a bancada prova: que o app **reage** a um evento de tempo real fabricado
+e ignora o de outro mês; que o `sw.js` monta a notificação a partir de um
+`push` fabricado e não morre com mensagem que não é JSON; que o texto do aviso
+sai certo no singular, no plural, na lista longa e no dia vazio.
+
+O que a bancada **não** prova, e nenhum teste automático aqui vai provar:
+que o evento atravessa a rede até o outro aparelho, e que a notificação chega.
+Isso é validação manual, e está pendente — a lista está logo abaixo.
+
+### Divergência entre o banco e o repositório
+
+O banco em produção tem uma tabela **`public.cron_push_inscricao`** que não
+existe em nenhum arquivo de `sql/`. Está vazia (0 linhas), com RLS ligada e sem
+política nenhuma, então ninguém lê nem escreve nela — não há risco, mas também
+não há razão para ela existir. `pg_cron` e `pg_net` não estão instalados e não
+há Edge Function nenhuma: não existe um segundo caminho de envio rodando por
+trás. Decidir se apaga ou se documenta é do Jonathan; a fase 0 não mexeu em
+produção.
+
+Contagem do banco em 02/09/2026: casa 1, perfil 2, lancamento 35, modelo 21,
+push_inscricao **1** — ou seja, já há um aparelho inscrito, ao contrário do que
+dizia o bloco 5.
+
+## VALIDAÇÕES MANUAIS PENDENTES
+
+Nenhuma delas pode ser feita por código; todas precisam de aparelho, de gente
+ou do painel do Supabase.
+
+1. **Rodar de novo os três SQLs** (`01`, `05`, `06`) no SQL Editor, para os
+   consertos de segurança valerem no banco. Depois, `sql/04_prova_rls.sql`
+   outra vez, que a medição 2 tem que continuar zerada.
+2. **Pôr `SUPABASE_SERVICE_ROLE` nos Secrets** — continua faltando:
+   `gh secret set SUPABASE_SERVICE_ROLE -R profjonathansousa/contas-casa`
+3. **Aviso diário, modo seco.** Actions > "Aviso diário das contas" > Run
+   workflow com **seco** marcado. Confere o texto sem mandar nada.
+4. **Aviso diário de verdade**, sem o seco. A notificação tem que chegar no
+   iPhone. Enquanto isso não acontecer, "Web Push feito" quer dizer só
+   "escrito".
+5. **Realtime entre dois aparelhos.** Duas telas abertas na mesma casa, marcar
+   pago numa e ver a outra mudar sozinha, sem recarregar.
+6. **Login da esposa**, e a inscrição do aparelho dela nos avisos.
+7. **Ligar a proteção de senha vazada** no Supabase (Authentication > Policies),
+   apontada pelo linter: hoje está desligada, e é um clique.
+8. **Decidir o destino de `public.cron_push_inscricao`.**
+
 ## PRÓXIMA AÇÃO EXATA
 
-1. Jonathan põe `SUPABASE_SERVICE_ROLE` nos Secrets (comando acima).
-2. No iPhone, abre o app e toca em **"Avisar neste aparelho"**. Tem que pedir
-   permissão e depois mostrar "✓ avisos ligados neste aparelho".
-3. No GitHub: Actions > "Aviso diário das contas" > Run workflow, marcando
-   **seco** — mostra o que enviaria sem enviar. Conferir o texto.
-4. Rodar de novo **sem** o seco. A notificação tem que chegar no iPhone.
-5. Só depois disso: Telegram, ou parcelas, ou offline.
+1. Rodar `sql/01_schema_rls.sql`, `sql/05_modelos.sql` e `sql/06_push.sql` no
+   SQL Editor (nesta ordem), e depois `sql/04_prova_rls.sql` para conferir que
+   a RLS continua de pé.
+2. Pôr o Secret `SUPABASE_SERVICE_ROLE`.
+3. Aviso diário em modo seco; conferir o texto.
+4. Aviso diário de verdade; a notificação tem que chegar.
+5. Testar o Realtime com dois aparelhos ao mesmo tempo.
+6. Só depois disso, escolher a fase 1 do plano novo: Telegram, parcelas ou
+   offline. Nada disso foi começado, e nada disso foi preparado de véspera.

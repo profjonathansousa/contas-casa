@@ -12,6 +12,7 @@ carro sem apertar os olhos, funcionar com o polegar de uma mão só.
 | Camada | Escolha |
 |---|---|
 | Interface | HTML + CSS + JavaScript puro. Sem framework, sem build, sem npm. |
+| Robô do aviso diário | Node no GitHub Actions, com `npm ci` e `package-lock.json` (só em `avisos/`, nunca no frontend) |
 | Banco, sync e login | Supabase (Postgres + Realtime + Auth), free tier |
 | Hospedagem | GitHub Pages, repositório público `contas-casa` |
 
@@ -28,11 +29,13 @@ CONTAS_CASA/
 │   ├── 05_modelos.sql         contas fixas + gerar_mes() + fixar_mes()
 │   ├── 06_push.sql            inscrições de aviso + resumo_do_dia()
 │   ├── 02_config_inicial.sql  modelo: cria a casa e os dois perfis
-│   └── 03_seed_ficticio.sql   dados de mentira, opcional, só para ver a tela
+│   ├── 03_seed_ficticio.sql   dados de mentira, opcional, só para ver a tela
+│   └── 04_prova_rls.sql       prova a RLS fingindo ser um usuário autenticado
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
-├── .github/workflows/         cron diário do aviso
-├── testes/                    bancada: roda app.js e sw.js reais no jsc
+│                              package.json + package-lock.json, instalado com npm ci
+├── .github/workflows/         cron diário do aviso, teste do push e a bancada
+├── testes/                    bancada: roda app.js e sw.js reais no jsc ou no node
 ├── vendor/supabase.js         supabase-js 2.112.4 (UMD), versionado de propósito
 ├── index.html
 ├── app.css
@@ -69,9 +72,11 @@ do mês volta para o mês corrente.
 ./testes/rodar.sh
 ```
 
-Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS),
-com DOM, relógio e Supabase falsos. Tem que fechar em 81 / 4 / 23 / 11 medidas e
-zero falhas.
+Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
+onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
+fechar em 81 / 4 / 23 / 11 medidas e zero falhas — e o próprio `rodar.sh` sai
+com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
+separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
 ## Modelo de dados
 
@@ -79,7 +84,8 @@ zero falhas.
 
 **perfil** — `id` (= `auth.uid()`), `casa_id`, `nome`
 
-**lancamento** — `id`, `casa_id`, `modelo_id` (sempre nulo na fase 1),
+**lancamento** — `id`, `casa_id`, `modelo_id` (nulo em conta digitada na mão;
+preenchido no que veio das contas fixas),
 `competencia` (date, sempre dia 1 do mês), `descricao`, `dia_vencimento` (int),
 `vencimento` (date), `valor_previsto` (numeric, anulável), `valor_pago`
 (numeric, anulável), `pago` (bool), `pago_em`, `pago_por`, `observacao`,
@@ -93,11 +99,15 @@ Três coisas o banco decide sozinho, e o cliente nunca escreve:
 `vencimento` (dia pedido, limitado ao último dia do mês — dia 31 em fevereiro
 não estoura), `pago_em` e `pago_por` (preenchidos por trigger quando `pago`
 vira verdadeiro, apagados quando volta a falso). É isso que faz o toque único
-mandar só `pago = true` e o selo de autoria não poder ser forjado.
+mandar só `pago = true` e o selo de autoria não poder ser forjado — nem no
+`update`, nem no `insert`, que até a fase 0 aceitava autor e hora vindos do
+cliente.
 
 ## Segurança
 
-- RLS ligado e forçado nas três tabelas, isolando por `casa_id`.
+- RLS ligado e forçado nas cinco tabelas (`casa`, `perfil`, `lancamento`,
+  `modelo`, `push_inscricao`), isolando por `casa_id` — e por pessoa, no caso
+  das inscrições de aviso.
 - No frontend só a `anon key`, que é pública por desenho — quem protege os
   dados é a RLS, não o segredo da chave.
 - `service_role key`, chave privada VAPID e token do Telegram: só em GitHub
@@ -115,8 +125,12 @@ a pagar e a contagem de itens em aberto sem valor; editar valor; adicionar
 conta avulsa; apagar conta segurando o dedo; navegar entre meses; PWA
 instalável; contas fixas com geração do mês.
 
-**Fase 2** — Web Push com VAPID e cron diário no GitHub Actions: **feito**.
-Falta o bot do Telegram como redundância e o offline com IndexedDB.
+**Fase 2** — Web Push com VAPID e cron diário no GitHub Actions: **escrito e
+medido na bancada, ainda não validado em produção** — nenhuma notificação
+chegou a nenhum aparelho até agora, e falta o Secret `SUPABASE_SERVICE_ROLE`.
+O `ESTADO.md` separa, item por item, o que está implementado, o que está
+testado e o que já foi validado no aparelho. Falta o bot do Telegram como
+redundância e o offline com IndexedDB.
 
 O aviso é **um por dia, e só quando há o que dizer**: dia sem conta vencendo e
 sem atraso não gera notificação nenhuma. Notificação que chega todo dia sem

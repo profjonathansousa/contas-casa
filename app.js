@@ -91,6 +91,20 @@ function cacheGravar() {
 function cacheLer() {
   try { return JSON.parse(localStorage.getItem(chaveCache()) || 'null'); } catch (e) { return null; }
 }
+// Sair tem que levar o dinheiro embora: o cache de pintura guarda descrição e
+// valor das contas, e sem isto eles ficavam no aparelho depois do logout.
+function cacheApagar() {
+  try {
+    if (typeof localStorage.length === 'number' && typeof localStorage.key === 'function') {
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('mes:') === 0) localStorage.removeItem(k);
+      }
+    } else {
+      localStorage.removeItem(chaveCache());
+    }
+  } catch (e) {}
+}
 
 /* ---------- entrar e sair ---------- */
 
@@ -116,6 +130,7 @@ el.formLogin.addEventListener('submit', async function (ev) {
 
 el.btnSair.addEventListener('click', async function () {
   if (canal) { db.removeChannel(canal); canal = null; }
+  cacheApagar();
   await db.auth.signOut();
   eu = null; itens = []; modelos = []; comp = mesDeHoje();
   el.mes.hidden = true; el.fixas.hidden = true; el.login.hidden = false;

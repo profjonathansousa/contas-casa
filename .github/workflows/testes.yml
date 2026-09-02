@@ -1,0 +1,25 @@
+name: Bancada de testes
+
+# Separado do Web Push de propósito: esta bancada não toca no banco, não
+# manda notificação e não usa Secret nenhum. Roda o app.js e o sw.js reais
+# fora do navegador, e fica vermelha se qualquer medida falhar.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bancada:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Rodar a bancada
+        run: ./testes/rodar.sh
