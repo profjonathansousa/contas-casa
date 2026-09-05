@@ -58,7 +58,7 @@ A terceira coluna é a que quase sempre falta.
 | **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
 | **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
 | **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
-| **contas que acabam (parcelas)** | sim (bloco 9) | sim (121/4/23/45) | **não — no ar, mas nenhuma conta foi marcada como parcelada ainda** |
+| **contas que acabam (parcelas)** | sim (bloco 9) | sim (121/4/24/45) | **não — no ar, mas nenhuma conta foi marcada como parcelada ainda** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -846,6 +846,32 @@ Conserto: os dígitos soltos passam a valer tanto quanto a forma com barra —
 entendido**, para não precisar salvar para descobrir. As formas com barra e com
 traço continuam valendo.
 
+### E o conserto não chegou: o service worker servia código vencido
+
+O conserto acima foi publicado e **não funcionou** — Jonathan viu a explicação
+nova da folha e continuou recebendo a recusa do formato. Diagnóstico:
+`index.html` chegou, `app.js` não.
+
+Causa, e é estrutural: **o `fetch()` de dentro do service worker ainda passa
+pelo cache HTTP do navegador**, e o GitHub Pages manda `max-age=600`. Ou seja,
+o "rede primeiro" do `sw.js` era, na prática, "cache do navegador primeiro, por
+até dez minutos". Como cada arquivo vence no seu próprio relógio, dá para
+receber a **tela nova rodando o código velho** — que é pior do que receber tudo
+velho, porque parece que atualizou.
+
+Conserto: os arquivos do app passam a ser pedidos com `cache: 'no-cache'`, que
+não quer dizer "baixe tudo de novo" e sim "pergunte se mudou" — a resposta 304
+continua barata. Requisição de navegação não pode ser reconstruída (o navegador
+recusa), então essa vai como veio. E o `VERSAO` subiu para `v5`, o que faz o
+`activate` limpar a casca antiga.
+
+Isso vale para todo conserto futuro: **até agora, publicar não garantia
+entregar.** Uma medida nova guarda a regra.
+
+De quebra, a bancada ensinou de novo a mesma lição do `URL`: o node traz um
+`Request` de verdade, que recusa o pedido de mentira da bancada. O falso agora
+vale nos dois motores, sem `typeof`.
+
 A lição, que vale para o bloco 8: **escolher o teclado é escolher o alfabeto**.
 Pedir `inputmode="numeric"` e depois exigir pontuação é contradição, e nenhuma
 medida da bancada pegaria isso — ela digita direto no campo, sem teclado. Só
@@ -859,7 +885,7 @@ virar aceitar qualquer coisa (mês 13 e ano sozinho continuam recusados).
 23 medidas novas, quatro delas controle negativo: parcelada que acabou some do
 "Trazer N contas fixas" e avisa "acabou, eram 3"; conta comum não ganha
 contador; um campo sem o outro não salva; mês rabiscado não passa. Placar:
-**121 / 4 / 23 / 45**, 0 falhas.
+**121 / 4 / 24 / 45**, 0 falhas.
 
 De quebra, a auditoria do placar pegou uma dívida da rodada anterior: o
 `rodar.sh` já exigia 45 no quarto bloco, mas o README e o `testes/LEIA.md`

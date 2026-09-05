@@ -43,6 +43,11 @@ var p = pedir('https://exemplo.github.io/app.js');
 esperar();
 medir('foi na rede', PEDIDOS_REDE.length, 1);
 
+print('\n  -- e pergunta se mudou, em vez de aceitar copia vencida --');
+print('  (o fetch do sw passa pelo cache HTTP; sem isto, "rede primeiro" vira');
+print('   "cache do navegador primeiro" e o app novo nao chega)');
+medir('pediu revalidacao', MODOS_REDE[MODOS_REDE.length - 1], 'no-cache');
+
 print('\n== fetch: sem rede, cai no cache ==');
 REDE_CAI = true;
 var resultado = null;

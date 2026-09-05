@@ -2,7 +2,7 @@
    Guarda só os arquivos do próprio app. Nada do Supabase é cacheado — dado de
    conta tem que vir do servidor, senão a tela mente. Fila offline é fase 2. */
 
-var VERSAO = 'nossas-contas-v4';
+var VERSAO = 'nossas-contas-v5';
 var CASCA = [
   './', './index.html', './app.css', './app.js', './config.js',
   './vendor/supabase.js', './manifest.webmanifest',
@@ -35,8 +35,22 @@ self.addEventListener('fetch', function (ev) {
 
   // Rede primeiro, cache como rede de segurança: assim uma versão nova do app
   // aparece sem precisar desinstalar nada.
+  //
+  // O "no-cache" não é enfeite. O fetch de dentro do service worker AINDA passa
+  // pelo cache HTTP do navegador, e o GitHub Pages manda max-age=600. Sem isto,
+  // "rede primeiro" é na verdade "cache do navegador primeiro, por até dez
+  // minutos" -- e index.html e app.js vencem em momentos diferentes. Em
+  // 05/09/2026 isso entregou a tela nova rodando o código velho, e o conserto
+  // que eu tinha acabado de publicar não chegou. "no-cache" não quer dizer
+  // "baixe tudo de novo": quer dizer "pergunte se mudou", e a resposta 304
+  // continua barata.
+  //
+  // Requisição de navegação não pode ser reconstruída (o navegador recusa), e
+  // por isso ela vai como veio.
+  var pedido = req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' });
+
   ev.respondWith(
-    fetch(req).then(function (resp) {
+    fetch(pedido).then(function (resp) {
       if (resp && resp.status === 200 && resp.type === 'basic') {
         var copia = resp.clone();
         caches.open(VERSAO).then(function (c) { c.put(req, copia); });

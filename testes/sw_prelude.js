@@ -8,9 +8,19 @@ if (typeof URL === 'undefined') {
     this.origin = m ? m[1] : ''; this.pathname = m ? m[2] : abs; this.href = abs;
   };
 }
+// Sempre o falso, nos dois motores: o node traz um Request de verdade, que
+// recusa o pedido de mentira da bancada. Aqui o mundo em volta é todo fingido.
+var Request = function (req, init) {
+  this.url = req.url || req;
+  this.method = req.method || 'GET';
+  this.mode = req.mode;
+  this.cache = init && init.cache;
+};
+
 var GUARDADO = {};      // nome do cache -> { url: resposta }
 var REDE_CAI = false;
 var PEDIDOS_REDE = [];
+var MODOS_REDE = [];    // como cada pedido foi a rede: 'no-cache' ou nada
 
 function Resp(url, status, tipo) { this.url = url; this.status = status === undefined ? 200 : status; this.type = tipo || 'basic'; }
 Resp.prototype.clone = function () { return new Resp(this.url, this.status, this.type); };
@@ -18,6 +28,7 @@ Resp.prototype.clone = function () { return new Resp(this.url, this.status, this
 function fetch(req) {
   var url = req.url || req;
   PEDIDOS_REDE.push(url);
+  MODOS_REDE.push(req.cache);
   if (REDE_CAI) return Promise.reject(new Error('offline'));
   return Promise.resolve(new Resp(url, 200, 'basic'));
 }
