@@ -94,7 +94,7 @@ por rollback, não ficou no banco).
 Arquivos: `index.html`, `app.css`, `app.js`, `config.js`, `sw.js`,
 `manifest.webmanifest`, `icones/` (4 PNGs gerados), `vendor/supabase.js`.
 
-Única dependência de terceiros: **@supabase/supabase-js 2.112.4**, build UMD,
+Única dependência de terceiros: **@supabase/supabase-js 2.97.0**, build UMD,
 versionada dentro do repositório em `vendor/` em vez de vir de CDN — assim o
 app não depende de outro servidor no ar e o service worker consegue cachear.
 
@@ -394,6 +394,106 @@ Contagem do banco em 02/09/2026: casa 1, perfil 2, lancamento 35, modelo 21,
 push_inscricao **1** — ou seja, já há um aparelho inscrito, ao contrário do que
 dizia o bloco 5.
 
+## Plano combinado em 05/09/2026
+
+Conversado com Jonathan depois da fase 0. Decisões dele, registradas para não
+se perderem:
+
+- **Quem paga é a esposa, na maioria das contas.** Ela recebe **só o aviso das
+  20h**; Jonathan recebe os três.
+- **Nada de DDA.** Buscar boleto por CPF é serviço de instituição financeira e
+  está fora de alcance (e trocar credencial de banco por conveniência inverte o
+  modelo de risco do projeto). Jonathan cola os códigos à mão.
+- **O aviso de véspera vira pedido de ação**, e só para quem cola: "Aluguel
+  vence amanhã — cole o código de pagamento no app".
+- **Agendador**: domar o GitHub primeiro, antes de cogitar trocar de
+  plataforma.
+
+### A dependência que decide a ordem
+
+"Cole o código" só é frase honesta depois que existir onde colar. Escolhida a
+ordem que entrega valor antes: o aviso de véspera nasce dizendo "deixe o
+pagamento pronto" e vira "cole o código" no bloco seguinte. Custo: mexer duas
+vezes numa frase.
+
+### Bloco 6 — pontualidade do agendador
+
+Fundação: sem isso, aviso com hora marcada é promessa que o GitHub não cumpre.
+
+- sair do minuto `:00` (é onde todo mundo agenda) e passar a rodar de hora em
+  hora
+- `enviar.mjs` decide pelo horário de São Paulo qual slot está aberto
+- tabela-registro `aviso_enviado` com chave única por pessoa, dia e slot: run
+  atrasado ainda manda, e **nunca manda duas vezes**
+- medir uma semana e anotar aqui o atraso observado
+- bancada: medidas para a escolha do slot e para o "não repete"
+
+### Bloco 7 — três avisos, por pessoa
+
+Hoje o robô monta **uma mensagem por casa** e manda para todos os aparelhos da
+casa. Para cada um receber uma coisa, o laço passa a ser **por pessoa**.
+
+- a preferência mora no `perfil` (a pessoa), não na `push_inscricao` (o
+  aparelho): assim iPhone e iPad da mesma pessoa seguem a mesma regra, e a
+  inscrição continua sendo só o endereço de entrega. **A RLS de `perfil` já
+  permite cada um editar a própria linha — não precisa de política nova.**
+- três colunas booleanas, todas `default true`; a esposa desliga duas, uma vez
+- `resumo_do_dia` ganha o de amanhã (`vencem_amanha`, `titulos_amanha`) — mesma
+  função, mesmo princípio de "uma função, dois usos"
+- app: três interruptores debaixo do botão de avisos
+- tag por slot, senão o aviso da noite some por cima do do meio-dia
+
+| slot (Brasília / UTC) | quem recebe | o que diz |
+|---|---|---|
+| véspera, 20h / 23:00 | só Jonathan | "Aluguel vence amanhã — deixe o pagamento pronto" |
+| dia, 12h / 15:00 | só Jonathan | "3 contas vencem hoje — R$ …" |
+| dia, 20h / 23:00 | os dois | "ainda hoje, não pago: …" + atrasadas |
+
+Os dois slots das 20h são **a mesma execução**: véspera e dia caem no mesmo
+relógio.
+
+**Pré-requisito humano:** a esposa nunca entrou no app. Sem o login dela e sem
+"avisar neste aparelho" no iPhone dela, não há para onde mandar as 20h.
+
+### Bloco 8 — código de pagamento colado
+
+A sutileza que manda no desenho: **a linha digitável muda todo mês.** Os 47
+dígitos do boleto bancário (e os 48 do de arrecadação) carregam fator de
+vencimento e valor. Então o código pertence ao **lançamento do mês**, não à
+conta fixa. O que cabe na conta fixa é **PIX estático** — chave sem valor —,
+que não muda.
+
+- `lancamento` ganha `codigo_pagamento` e `codigo_tipo`
+- `modelo` ganha o PIX estático
+- app: "colar código" → valida (módulo 10 e 11 no boleto, CRC16 no PIX),
+  **extrai valor e vencimento** e mostra para conferir. Isso mata o "???" no
+  gesto de colar.
+- na linha da conta, um botão "copiar"
+- o aviso de véspera passa a dizer quantas ainda estão sem código
+- bancada: validador e extrator são funções puras, exatamente o que ela mede bem
+
+Privacidade: linha digitável e PIX são dado de pagamento — identificam
+beneficiário e valor. Ficam sob a mesma RLS, passam a estar também no cache do
+`localStorage` (o que justifica melhor a limpeza no logout feita na fase 0) e
+**nunca entram no repositório**.
+
+### Riscos que ficam escritos antes de começar
+
+1. **O atraso pode não ceder.** Se depois de uma semana continuar acima de uma
+   hora, volta a conversa do `pg_cron` — e aí a chave VAPID privada sai dos
+   GitHub Secrets e vai para o Vault do Supabase. É outra camada e outro modelo
+   de segredo; não entra sem decisão explícita.
+2. **Três avisos por dia é muito.** Com 21 contas fixas espalhadas, é
+   notificação em quase todo dia útil. O liga-desliga protege, mas vale
+   reavaliar depois de duas semanas de uso — o próprio README diz que
+   notificação sem motivo é notificação que se aprende a ignorar.
+3. **Dado novo e sensível** no banco e no aparelho, com o bloco 8.
+
+### Fora de fila, e continua doendo
+
+**Parcelas.** Cinco contas voltam todo mês e Jonathan desliga na mão. Nenhum
+dos três blocos acima encosta nisso.
+
 ## VALIDAÇÕES MANUAIS PENDENTES
 
 Nenhuma delas pode ser feita por código; todas precisam de aparelho, de gente
@@ -420,12 +520,11 @@ ou do painel do Supabase.
 
 ## PRÓXIMA AÇÃO EXATA
 
-1. Resolver a **pontualidade do cron** antes de prometer qualquer aviso com
-   hora marcada. Primeiro tiro, de graça: sair do minuto `:00`.
-2. Testar o **Realtime com dois aparelhos** ao mesmo tempo — é a última coisa
-   da fase 1 sem validação.
+1. **Bloco 6**, o agendador. É a fundação dos outros dois.
+2. Em paralelo, duas coisas humanas: **a esposa entra no app** e liga os avisos
+   no iPhone dela (sem isso o bloco 7 não tem para onde mandar), e **o teste do
+   Realtime com dois aparelhos**, que é a última coisa da fase 1 sem prova.
 3. Rodar `sql/04_prova_rls.sql` para conferir que a RLS continua de pé depois
    da migração de 05/09.
-4. Só então o que Jonathan pediu em 05/09: os três horários de aviso e o
-   código de barras / PIX colado no lançamento. Nada disso foi começado, e
-   nada disso foi preparado de véspera.
+4. Bloco 7, depois bloco 8. Nada dos três foi começado nem preparado de
+   véspera.

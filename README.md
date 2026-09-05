@@ -36,7 +36,7 @@ CONTAS_CASA/
 │                              package.json + package-lock.json, instalado com npm ci
 ├── .github/workflows/         cron diário do aviso, teste do push e a bancada
 ├── testes/                    bancada: roda app.js e sw.js reais no jsc ou no node
-├── vendor/supabase.js         supabase-js 2.112.4 (UMD), versionado de propósito
+├── vendor/supabase.js         supabase-js 2.97.0 (UMD), versionado de propósito
 ├── index.html
 ├── app.css
 ├── app.js
