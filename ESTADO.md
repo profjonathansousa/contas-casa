@@ -1006,6 +1006,45 @@ tem valor e segurar sem apagar.
 **Colar o primeiro código de verdade e conferir no aparelho.** É a única coisa
 que separa este bloco de estar validado — e a que nenhuma bancada faz.
 
+## Risco descoberto em 05/09: ninguém sabe as senhas
+
+Jonathan perguntou onde estão as senhas. Não estão em lugar nenhum, e **isso é
+o desenho certo**: o Supabase Auth guarda hash bcrypt, não a senha. Não existe
+"onde ver" — existe "como trocar".
+
+O que o banco mostra, e é o incômodo:
+
+| medição | resultado |
+|---|---|
+| último login do Jonathan | **31/08**, uma única vez |
+| último login da segunda pessoa | **nunca** |
+| e-mail confirmado nas duas contas | sim |
+| senha definida nas duas | sim (o hash existe; ninguém o lê) |
+
+Ou seja: o app funciona há cinco dias montado numa **sessão persistida de
+31/08**. Ele está a um logout de perder o acesso às próprias contas, e não há
+como reaver sozinho.
+
+**O app não tem recuperação de senha.** A tela de login pede e-mail e senha e
+não oferece "esqueci a senha". Foi decisão da fase 1 que nunca virou pendência
+escrita.
+
+Caminho para reaver, hoje, sem código: painel do Supabase >
+**Authentication > Users >** a pessoa > definir uma senha nova. Direto, sem
+depender de e-mail.
+
+Por que não basta "botar um esqueci a senha": o fluxo por e-mail depende de
+SMTP, e o serviço embutido do Supabase é limitado e, em projeto novo, só
+entrega para endereços da própria organização — o e-mail dela não receberia.
+Recuperação por e-mail de verdade exige **configurar SMTP próprio** primeiro.
+Enquanto isso não existir, a recuperação é manual, pelo painel, e essa é a
+decisão honesta a registrar.
+
+Detalhe que ajuda e já está certo no código: os campos de login têm
+`autocomplete="username"` e `current-password`, então o Chaveiro do iPhone
+oferece guardar a senha no próximo login. **Guardar ali resolve o problema
+prático das duas pessoas.**
+
 ## VALIDAÇÕES MANUAIS PENDENTES
 
 Nenhuma delas pode ser feita por código; todas precisam de aparelho, de gente
@@ -1060,7 +1099,9 @@ não é código — é uso e prova no aparelho.
 
 ## PRÓXIMA AÇÃO EXATA
 
-1. **Colar o primeiro código** numa conta e conferir que o valor vem sozinho.
+1. **Definir senhas novas pelo painel** e guardá-las no Chaveiro do iPhone no
+   login seguinte. Hoje o acesso depende de uma sessão de 31/08.
+2. **Colar o primeiro código** numa conta e conferir que o valor vem sozinho.
 2. **Conferir no Actions a que horas os runs de hoje dispararam** e se o aviso
    chegou perto do meio-dia. É a medição que decide se o GitHub serve ou se a
    conversa do `pg_cron` volta. Primeira execução do cron novo: 15:17 UTC.
