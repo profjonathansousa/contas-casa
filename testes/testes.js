@@ -307,5 +307,97 @@ medir('os outros dois seguem ligados',
       [q('#pref-vespera')._txt, q('#pref-20h')._txt],
       ['\u2713 na véspera, 20h', '\u2713 no dia, 20h']);
 
+print('\n== 15. contas que acabam ==');
+print('  (o buraco: acordo parcelado que volta todo mes depois de acabar)');
+// o controle do bloco 13 deixou uma fixa a mais em MODELOS; devolve ao original
+MODELOS.length = 0;
+guardaM.forEach(function (x) { MODELOS.push(x); });
+function fixaPorDesc(d) {
+  return fixasDesenhadas().filter(function (f) { return f.filhos[1].filhos[0]._txt === d; })[0];
+}
+function subtitulo(fixa) { return fixa.filhos[1].filhos[1]._txt; }
+function abrirFixas() { q('#btn-fixas').disparar('click'); esperar(); }
+function voltarDasFixas() { q('#fx-voltar').disparar('click'); esperar(); }
+
+abrirFixas();
+medir('a parcelada diz onde esta', subtitulo(fixaPorDesc('Condominio')),
+      'todo dia 31 · parcela 5 de 12');
+medir('a mensal nao inventa parcela', subtitulo(fixaPorDesc('Aluguel')), 'todo dia 5');
+
+print('\n  -- na tela do mes, a conta diz de quantas e --');
+voltarDasFixas();
+q('#mes-prox').disparar('click'); esperar();      // ida e volta para reler o mes
+q('#mes-ant').disparar('click'); esperar();
+function itemPorDesc(d) {
+  return itensDesenhados().filter(function (i) { return i.filhos[1].filhos[0]._txt === d; })[0];
+}
+medir('contador na linha', itemPorDesc('Cartao azul').filhos[1].filhos[1]._txt, '5/12');
+medir('conta comum nao ganha contador', itemPorDesc('Luz').filhos[1].filhos.length, 1);
+
+print('\n  -- CONTROLE NEGATIVO --');
+print('  (parcelada que acabou NAO pode continuar sendo oferecida)');
+medir('enquanto vale, o botao oferece', q('#btn-gerar')._txt,
+      'Trazer 1 conta fixa para este mês');
+MODELOS[3].parcelas_total = 3;                    // as 12 viram 3: acabou ha meses
+abrirFixas();
+medir('a fixa avisa que acabou', subtitulo(fixaPorDesc('Condominio')),
+      'todo dia 31 · acabou, eram 3');
+voltarDasFixas();
+medir('e sumiu do botao de trazer', q('#btn-gerar').hidden, true);
+MODELOS[3].parcelas_total = 12;
+
+print('\n  -- a folha de parcelas --');
+abrirFixas();
+var upP = LOG.updates.length;
+var subtituloDe = fixaPorDesc('Condominio').filhos[1].filhos[1];
+subtituloDe.disparar('click');
+medir('abriu a folha', q('#folha-parcelas').hidden, false);
+medir('diz qual conta', q('#pc-desc')._txt, 'Condominio');
+medir('ja vem preenchida', [q('#pc-total').value, q('#pc-mes').value],
+      ['12', MES_PARCELA_1.slice(5, 7) + '/' + MES_PARCELA_1.slice(0, 4)]);
+print('  (tocar aqui NAO pode ligar nem desligar a fixa)');
+esperar();
+medir('nao mexeu na fixa', LOG.updates.length - upP, 0);
+
+q('#pc-total').value = '6';
+q('#pc-mes').value = '03/2026';
+q('#folha-parcelas').disparar('submit');
+esperar();
+medir('tabela', LOG.updates[upP].tabela, 'modelo');
+medir('campos no update', LOG.updates[upP].campos.slice().sort(), ['parcela_1', 'parcelas_total']);
+medir('mes interpretado', LOG.updates[upP].valores.parcela_1, '2026-03-01');
+medir('quantas parcelas', LOG.updates[upP].valores.parcelas_total, 6);
+medir('folha fechou', q('#folha-parcelas').hidden, true);
+
+print('\n  -- CONTROLE NEGATIVO --');
+print('  ("12 vezes" a partir de quando? uma sem a outra nao diz nada)');
+var upQ = LOG.updates.length;
+fixaPorDesc('Condominio').filhos[1].filhos[1].disparar('click');
+q('#pc-total').value = '10';
+q('#pc-mes').value = '';
+q('#folha-parcelas').disparar('submit');
+esperar();
+medir('recusou', LOG.updates.length - upQ, 0);
+medir('e disse por que', q('#erro-parcelas')._txt,
+      'Preencha os dois, ou deixe os dois vazios.');
+medir('folha continua aberta', q('#folha-parcelas').hidden, false);
+
+print('  (e mes rabiscado tambem nao passa)');
+q('#pc-mes').value = '13/2026';
+q('#folha-parcelas').disparar('submit');
+esperar();
+medir('recusou o mes', LOG.updates.length - upQ, 0);
+medir('disse por que', q('#erro-parcelas')._txt, 'Não entendi o mês. Use mm/aaaa.');
+
+print('\n  -- limpar os dois volta a ser mensal para sempre --');
+q('#pc-total').value = '';
+q('#pc-mes').value = '';
+q('#folha-parcelas').disparar('submit');
+esperar();
+medir('mandou nulo nos dois',
+      [LOG.updates[upQ].valores.parcelas_total, LOG.updates[upQ].valores.parcela_1],
+      [null, null]);
+medir('e a fixa volta a ser so "todo dia"', subtitulo(fixaPorDesc('Condominio')), 'todo dia 31');
+
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

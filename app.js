@@ -25,11 +25,15 @@ var el = {
   fixas: $('#tela-fixas'), fxLista: $('#fx-lista'), fxVoltar: $('#fx-voltar'),
   fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes'), btnAvisos: $('#btn-avisos'),
   prefAvisos: $('#pref-avisos'), prefVespera: $('#pref-vespera'),
-  pref12: $('#pref-12h'), pref20: $('#pref-20h')
+  pref12: $('#pref-12h'), pref20: $('#pref-20h'),
+  fundoParcelas: $('#fundo-parcelas'), folhaParcelas: $('#folha-parcelas'),
+  pcDesc: $('#pc-desc'), pcTotal: $('#pc-total'), pcMes: $('#pc-mes'),
+  pcCancelar: $('#pc-cancelar'), erroParcelas: $('#erro-parcelas')
 };
 
 var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
-              'valor_previsto,valor_pago,pago,pago_em,pago_por';
+              'valor_previsto,valor_pago,pago,pago_em,pago_por,' +
+              'parcela_n,parcela_de';
 
 var eu = null;        // { id, casa_id, nome }
 var nomes = {};       // id do perfil -> primeiro nome
@@ -42,7 +46,7 @@ var paraApagar = null;      // item aguardando confirmação de exclusão
 var tipoApagar = 'lancamento';
 var modoFolha = 'lancamento';   // a folha de "+" serve às duas telas
 var modelos = [];               // contas fixas
-var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo';
+var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo,parcelas_total,parcela_1';
 var COLUNAS_PERFIL = 'id, casa_id, nome, avisa_vespera_20h, avisa_dia_12h, avisa_dia_20h';
 
 // Os três avisos do dia, e a coluna do perfil que manda em cada um. A
@@ -82,6 +86,39 @@ function paraNumero(txt) {
   var n = Number(s);
   if (!isFinite(n) || n < 0) return NaN;
   return Math.round(n * 100) / 100;
+}
+
+/* ---------- parcelas ---------- */
+
+// Qual parcela cai neste mês. Nulo quando a conta não é parcelada. Pode voltar
+// 0, negativo ou maior que o total — quem decide se entra é quem pergunta.
+// A mesma conta existe no banco, em parcela_no_mes(): são três linhas de cada
+// lado, e as duas são medidas.
+function parcelaNoMes(m, competencia) {
+  if (m.parcelas_total == null || !m.parcela_1) return null;
+  var a = m.parcela_1.split('-'), b = competencia.split('-');
+  return (+b[0] - +a[0]) * 12 + (+b[1] - +a[1]) + 1;
+}
+function valeNoMes(m, competencia) {
+  var n = parcelaNoMes(m, competencia);
+  return n === null || (n >= 1 && n <= m.parcelas_total);
+}
+
+// "03/2026", "3/2026", "3-2026" -> "2026-03-01". Vazio = sem parcelas.
+// Rabisco devolve NaN, mesma convenção do paraNumero.
+function paraCompetencia(txt) {
+  var s = String(txt == null ? '' : txt).trim();
+  if (!s) return null;
+  var m = /^(\d{1,2})\s*[\/\-.]\s*(\d{4})$/.exec(s);
+  if (!m) return NaN;
+  var mes = +m[1], ano = +m[2];
+  if (mes < 1 || mes > 12) return NaN;
+  return ano + '-' + String(mes).padStart(2, '0') + '-01';
+}
+function deCompetencia(iso) {
+  if (!iso) return '';
+  var p = iso.split('-');
+  return p[1] + '/' + p[0];
 }
 
 /* ---------- avisos ---------- */
@@ -298,6 +335,12 @@ function linha(it) {
   desc.className = 'desc';
   desc.textContent = it.descricao;
   corpo.appendChild(desc);
+  if (it.parcela_n != null && it.parcela_de != null) {
+    var pc = document.createElement('div');
+    pc.className = 'parcela';
+    pc.textContent = it.parcela_n + '/' + it.parcela_de;
+    corpo.appendChild(pc);
+  }
   if (it.pago && it.pago_em) {
     var selo = document.createElement('div');
     selo.className = 'selo';
@@ -454,7 +497,7 @@ function faltandoNoMes() {
   var tem = {};
   itens.forEach(function (i) { tem[i.descricao.trim().toLowerCase()] = 1; });
   return modelos.filter(function (m) {
-    return m.ativo && !tem[m.descricao.trim().toLowerCase()];
+    return m.ativo && valeNoMes(m, comp) && !tem[m.descricao.trim().toLowerCase()];
   });
 }
 
@@ -531,9 +574,14 @@ function linhaModelo(m) {
   desc.className = 'desc';
   desc.textContent = m.descricao;
   corpo.appendChild(desc);
-  var dia = document.createElement('div');
+  var dia = document.createElement('button');
+  dia.type = 'button';
   dia.className = 'fx-dia';
-  dia.textContent = 'todo dia ' + m.dia_vencimento;
+  dia.textContent = 'todo dia ' + m.dia_vencimento + rotuloParcela(m);
+  dia.setAttribute('aria-label', 'Parcelas de ' + m.descricao);
+  // tocar aqui abre as parcelas; tocar no resto da linha liga e desliga
+  dia.addEventListener('click', function (ev) { ev.stopPropagation(); abrirParcelas(m); });
+  dia.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
   corpo.appendChild(dia);
 
   var valor = document.createElement('button');
@@ -551,6 +599,60 @@ function linhaModelo(m) {
   div.appendChild(valor);
   return div;
 }
+
+function rotuloParcela(m) {
+  var n = parcelaNoMes(m, comp);
+  if (n === null) return '';
+  if (n < 1) return ' · começa em ' + deCompetencia(m.parcela_1);
+  if (n > m.parcelas_total) return ' · acabou, eram ' + m.parcelas_total;
+  return ' · parcela ' + n + ' de ' + m.parcelas_total;
+}
+
+var fixaEmEdicao = null;
+function abrirParcelas(m) {
+  fixaEmEdicao = m;
+  el.pcDesc.textContent = m.descricao;
+  el.pcTotal.value = m.parcelas_total == null ? '' : String(m.parcelas_total);
+  el.pcMes.value = deCompetencia(m.parcela_1);
+  el.erroParcelas.hidden = true;
+  el.fundoParcelas.hidden = false;
+  el.folhaParcelas.hidden = false;
+}
+function fecharParcelas() {
+  fixaEmEdicao = null;
+  el.fundoParcelas.hidden = true;
+  el.folhaParcelas.hidden = true;
+}
+el.pcCancelar.addEventListener('click', fecharParcelas);
+el.fundoParcelas.addEventListener('click', fecharParcelas);
+
+el.folhaParcelas.addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  var m = fixaEmEdicao;
+  if (!m) return;
+  function erro(txt) { el.erroParcelas.textContent = txt; el.erroParcelas.hidden = false; }
+  el.erroParcelas.hidden = true;
+
+  var bruto = String(el.pcTotal.value).trim();
+  var total = bruto === '' ? null : parseInt(bruto, 10);
+  var mes = paraCompetencia(el.pcMes.value);
+
+  if (typeof mes === 'number' && isNaN(mes)) { erro('Não entendi o mês. Use mm/aaaa.'); return; }
+  if (total !== null && !(total >= 1 && total <= 360)) { erro('Quantas parcelas? Um número de 1 a 360.'); return; }
+  // uma sem a outra não diz nada: "12 vezes" a partir de quando?
+  if ((total === null) !== (mes === null)) { erro('Preencha os dois, ou deixe os dois vazios.'); return; }
+
+  var antesT = m.parcelas_total, antesM = m.parcela_1;
+  m.parcelas_total = total; m.parcela_1 = mes;
+  fecharParcelas();
+  desenharFixas();
+  var r = await db.from('modelo').update({ parcelas_total: total, parcela_1: mes }).eq('id', m.id);
+  if (r.error) {
+    m.parcelas_total = antesT; m.parcela_1 = antesM;
+    desenharFixas();
+    aviso('Não deu para salvar. ' + r.error.message);
+  }
+});
 
 async function alternarAtivo(m) {
   var antes = m.ativo;

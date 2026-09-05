@@ -32,7 +32,8 @@ CONTAS_CASA/
 │   ├── 05_modelos.sql         contas fixas + gerar_mes() + fixar_mes()
 │   ├── 06_push.sql            inscrições de aviso + resumo_do_dia()
 │   ├── 07_avisos.sql          memória de aviso enviado (um por dia e por slot)
-│   └── 08_avisos_por_pessoa.sql  preferência de aviso por pessoa + véspera
+│   ├── 08_avisos_por_pessoa.sql  preferência de aviso por pessoa + véspera
+│   └── 09_parcelas.sql        contas que acabam: 12 vezes a partir de tal mês
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -60,6 +61,17 @@ Num mês onde falta alguma fixa, a tela do mês mostra "Trazer N contas fixas".
 Gerar o mês duas vezes não duplica nada: a comparação é por descrição, então
 conta já digitada na mão também não vem repetida.
 
+**Conta que acaba.** Acordo parcelado, parcela de imposto, material escolar —
+o que vem doze vezes e para. Toque na linha "todo dia 8" de uma conta fixa e
+diga quantas vezes e o mês da primeira; a partir daí ela vem sozinha enquanto
+vale, mostra "5/12" na tela do mês, e **para de ser oferecida quando a última
+passou**. Deixar os dois campos vazios é o normal: conta que se repete para
+sempre.
+
+O contador mora em coluna própria, não na descrição — descrição que muda todo
+mês faria a mesma conta entrar de novo toda vez, porque é por descrição que o
+banco compara.
+
 ## Como se usa
 
 Um toque em qualquer ponto da linha **marca ou desmarca pago**, sem confirmação
@@ -80,7 +92,7 @@ desliga cada um.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
 onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 91 / 4 / 23 / 40 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 114 / 4 / 23 / 45 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -183,7 +195,8 @@ que sabe ficar vermelha e roda no CI, `npm ci` com lockfile, quatro furos de
 RLS e de permissão fechados no SQL. Sem funcionalidade nova. Os consertos de
 SQL só valem no banco depois de rodar os arquivos de novo — está no `ESTADO.md`.
 
-**Fase 3 — nada começado, nada preparado de véspera.** Parcelas (hoje o buraco
-conhecido: cinco contas não são mensais para sempre e voltam todo mês),
-geração automática do mês sem apertar botão, gráficos, importação de histórico,
-receitas.
+**Fase 3 — começada pelas parcelas.** O bloco 9 tirou dela o controle de
+parcelas, que era o buraco que custava trabalho todo mês: cinco contas não são
+mensais para sempre e voltavam sozinhas. Continuam por fazer, e sem nada
+preparado de véspera: geração automática do mês sem apertar botão, gráficos,
+importação de histórico, receitas.

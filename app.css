@@ -136,7 +136,16 @@ button { border: 0; background: none; cursor: pointer; }
 /* conta fixa desligada: continua legível, mas claramente fora do ar */
 .item.desligado { opacity: .45; }
 .item.desligado .marca { border-style: dashed; }
-.fx-dia { font-size: 13.5px; color: var(--fraco); margin-top: 2px; }
+.fx-dia {
+  font-size: 13.5px; color: var(--fraco); margin-top: 2px;
+  background: none; border: 0; padding: 0; text-align: left; display: block;
+}
+.fx-dia:active { opacity: .6; }
+
+/* "5/12" na linha do mês: discreto, mas responde à pergunta que a pessoa faz
+   olhando a conta — falta muito? */
+.parcela { font-size: 13px; color: var(--fraco); margin-top: 2px; }
+.item.pago .parcela { opacity: .7; }
 .dia {
   font-size: 13px; font-weight: 700; color: var(--fraco);
   text-transform: uppercase; letter-spacing: .08em;

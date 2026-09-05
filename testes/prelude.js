@@ -103,6 +103,15 @@ var MODELOS = [
   mod('m3', 'Escola', 15, 740.00, false),
   mod('m4', 'Condominio', 31, 480.00, true)
 ];
+// Condominio e um acordo parcelado que ainda esta correndo: 12 vezes, comecando
+// quatro meses atras, entao o mes de hoje e a parcela 5.
+var MES_PARCELA_1 = (function () {
+  var p = MES.split('-'), d = new Date(+p[0], +p[1] - 1 - 4, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+})();
+MODELOS[3].parcelas_total = 12;
+MODELOS[3].parcela_1 = MES_PARCELA_1;
+
 var BANCO = [
   lanc('l1', 'Aluguel', 5, 1800.00, false),
   lanc('l2', 'Luz', 8, null, false),
@@ -110,6 +119,10 @@ var BANCO = [
   lanc('l4', 'Internet', 10, 129.90, true),
   lanc('l5', 'Cartao azul', 15, null, false)
 ];
+
+// Cartao azul e a parcela 5 de 12 do mesmo acordo, ja no mes.
+BANCO[4].parcela_n = 5;
+BANCO[4].parcela_de = 12;
 
 function thenable(valor) {
   var o = {

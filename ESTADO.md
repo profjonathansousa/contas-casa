@@ -57,7 +57,8 @@ A terceira coluna é a que quase sempre falta.
 | **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **sim — chegou no iPhone; último envio 03/09/2026** |
 | **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
 | **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
-| **três avisos, um por pessoa** | sim (bloco 7) | sim (91/4/23/45) | **não — nenhum chegou a aparelho ainda** |
+| **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
+| **contas que acabam (parcelas)** | sim (bloco 9) | sim (114/4/23/45) | **não — espera `sql/09` e merge** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -685,7 +686,8 @@ Código e banco estão prontos; o que falta é gente e aparelho.
 2. **Ver o aviso de véspera chegar.** Actions > "Aviso diário das contas" >
    Run workflow, escolhendo `vespera_20h` e marcando **seco** para conferir o
    texto sem mandar; depois sem o seco.
-3. **Ver os três interruptores** no rodapé do app, no iPhone.
+3. ~~Ver os três interruptores no rodapé do app, no iPhone.~~ **Feito em
+   05/09: apareceram.** É a primeira parte do bloco 7 validada em produção.
 
 ### O que o cron mostrou no dia do merge
 
@@ -788,6 +790,61 @@ estão no repositório e não vão estar.**
 A janela é função pura: parcela 1 no mês da primeira, 12 no décimo segundo,
 nada no décimo terceiro, nada antes da primeira. Mais o controle negativo de
 sempre: conta sem `parcelas_total` continua vindo todo mês, para sempre.
+
+## Bloco 9 — contas que acabam (05/09/2026)
+
+**Escrito e medido. Espera `sql/09` e merge.**
+
+O buraco estava registrado desde o começo, em "Buraco conhecido": cinco contas
+não são mensais para sempre — acordos parcelados, uma parcela de imposto, um
+material escolar — e voltavam todo mês até alguém desligá-las na mão. Ficou
+mais caro depois do bloco 7: uma parcelada encerrada que continua vindo vira
+**três alarmes falsos por dia**.
+
+Uma frase: uma conta fixa passa a poder dizer "sou 12 vezes, a partir de tal
+mês", e o `gerar_mes()` para de trazê-la quando a última passou.
+
+### As decisões que valem estar escritas
+
+- **O contador vai em coluna própria, não na descrição.** Escrever "Acordo
+  (5/12)" seria o caminho óbvio e estaria errado: a regra que impede o
+  `gerar_mes()` de duplicar compara **por descrição**, e uma descrição que muda
+  todo mês faria a mesma conta entrar de novo toda vez. Quem junta as duas
+  coisas é a tela.
+- **As duas colunas andam em par**, com constraint no banco e conferência na
+  tela: "12 vezes" sem dizer a partir de quando não diz nada.
+- **Nada de desligar sozinho.** O `gerar_mes()` poderia marcar `ativo = false`
+  ao gerar a última, e foi descartado: `ativo` quer dizer "eu quero" e a janela
+  quer dizer "ainda existe". Misturar os dois confunde na hora de entender por
+  que uma conta sumiu.
+- **Custo aceito:** a aritmética da janela existe em dois lugares — na função
+  `parcela_no_mes()` do banco e no `parcelaNoMes()` do `app.js`. São três
+  linhas de cada lado, e o lado JavaScript é medido.
+- **O gesto novo:** tocar na linha "todo dia 8" da conta fixa abre a folha de
+  parcelas. Era a única parte da linha que não fazia nada. O toque para lá
+  **não pode** ligar nem desligar a fixa — isso é medido.
+- **O mês é digitado como `mm/aaaa`**, não em `<input type="month">`: o Safari
+  do iPhone não é confiável nesse tipo de campo. A leitura é função pura e
+  recusa rabisco.
+
+### O que a bancada mede
+
+23 medidas novas, quatro delas controle negativo: parcelada que acabou some do
+"Trazer N contas fixas" e avisa "acabou, eram 3"; conta comum não ganha
+contador; um campo sem o outro não salva; mês rabiscado não passa. Placar:
+**114 / 4 / 23 / 45**, 0 falhas.
+
+De quebra, a auditoria do placar pegou uma dívida da rodada anterior: o
+`rodar.sh` já exigia 45 no quarto bloco, mas o README e o `testes/LEIA.md`
+ainda diziam 40. O guarda do placar confere o `rodar.sh`, não os documentos.
+
+### O que falta
+
+1. Rodar `sql/09_parcelas.sql` no banco — **antes do merge**, pela mesma razão
+   do bloco 7: o `app.js` passa a pedir as colunas novas.
+2. Mesclar.
+3. **Preencher as cinco contas** que já existem, pela tela. Quais são elas está
+   no banco e na conversa, **não aqui**.
 
 ## VALIDAÇÕES MANUAIS PENDENTES
 
