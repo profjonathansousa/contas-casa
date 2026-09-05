@@ -58,8 +58,8 @@ A terceira coluna é a que quase sempre falta.
 | **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
 | **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
 | **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
-| **contas que acabam (parcelas)** | sim (bloco 9) | sim | **não — no ar, mas nenhuma conta foi marcada como parcelada ainda** |
-| **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — espera `sql/10` e merge** |
+| **contas que acabam (parcelas)** | sim (bloco 9) | sim | **sim — confirmado por Jonathan em 05/09; 3 contas fixas já parceladas no banco** |
+| **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — no ar, mas nenhum código colado ainda** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -919,7 +919,13 @@ isso não for feito, o bloco 9 está no ar sem estar em uso.
 
 ## Bloco 8 — o código de pagamento colado (05/09/2026)
 
-**Escrito e medido. Espera `sql/10` e merge.**
+**No ar desde 05/09/2026.** `sql/10_codigo_pagamento.sql` aplicado **antes** do
+merge, pela terceira vez pela mesma razão; branch mesclada em seguida.
+
+Conferido no banco: duas colunas novas no `lancamento`, o PIX estático na
+`modelo`, as duas regras de integridade (tipo válido, e código e tipo andando
+em par), e `resumo_do_dia` ainda `security invoker` e sem execução para
+`anon`.
 
 Fecha o pedido que abriu esta conversa: *"conta x vencendo amanhã, cole o
 código de pagamento no app"*.
@@ -997,10 +1003,8 @@ tem valor e segurar sem apagar.
 
 ### O que falta
 
-1. Rodar `sql/10_codigo_pagamento.sql` — **antes do merge**, pela terceira vez
-   pela mesma razão.
-2. Mesclar.
-3. Colar o primeiro código de verdade e conferir no aparelho.
+**Colar o primeiro código de verdade e conferir no aparelho.** É a única coisa
+que separa este bloco de estar validado — e a que nenhuma bancada faz.
 
 ## VALIDAÇÕES MANUAIS PENDENTES
 
@@ -1048,9 +1052,16 @@ tivesse sido só mudar o minuto do cron, o aviso de hoje teria se perdido.
 `pessoas: 2` é o laço por pessoa do bloco 7 rodando em produção pela primeira
 vez, lendo as colunas novas do perfil sem erro.
 
+## O roadmap acabou
+
+Os quatro blocos combinados em 05/09 estão no ar: **6** (pontualidade), **7**
+(três avisos por pessoa), **9** (parcelas) e **8** (código colado). O que resta
+não é código — é uso e prova no aparelho.
+
 ## PRÓXIMA AÇÃO EXATA
 
-1. **Conferir no Actions a que horas os runs de hoje dispararam** e se o aviso
+1. **Colar o primeiro código** numa conta e conferir que o valor vem sozinho.
+2. **Conferir no Actions a que horas os runs de hoje dispararam** e se o aviso
    chegou perto do meio-dia. É a medição que decide se o GitHub serve ou se a
    conversa do `pg_cron` volta. Primeira execução do cron novo: 15:17 UTC.
 2. ~~Rodar `sql/08` e mesclar o bloco 7.~~ **Feito.** ~~E o `sql/09` do bloco
