@@ -26,11 +26,11 @@ CONTAS_CASA/
 ├── .nojekyll                  desliga o Jekyll no GitHub Pages
 ├── sql/
 │   ├── 01_schema_rls.sql      schema + RLS (rodar uma vez)
-│   ├── 05_modelos.sql         contas fixas + gerar_mes() + fixar_mes()
-│   ├── 06_push.sql            inscrições de aviso + resumo_do_dia()
 │   ├── 02_config_inicial.sql  modelo: cria a casa e os dois perfis
 │   ├── 03_seed_ficticio.sql   dados de mentira, opcional, só para ver a tela
-│   └── 04_prova_rls.sql       prova a RLS fingindo ser um usuário autenticado
+│   ├── 04_prova_rls.sql       prova a RLS fingindo ser um usuário autenticado
+│   ├── 05_modelos.sql         contas fixas + gerar_mes() + fixar_mes()
+│   └── 06_push.sql            inscrições de aviso + resumo_do_dia()
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -118,25 +118,39 @@ cliente.
 
 ## Fases
 
-**Fase 1 (esta)** — estrutura e SQL; login por e-mail e senha; tela do mês
-agrupada por dia de vencimento; toque único marca e desmarca pago; sync em
-tempo real; selo "pago por fulano, 14:32"; cabeçalho fixo com previsto / pago /
-a pagar e a contagem de itens em aberto sem valor; editar valor; adicionar
-conta avulsa; apagar conta segurando o dedo; navegar entre meses; PWA
-instalável; contas fixas com geração do mês.
+Três estados diferentes, e a diferença importa: **escrito** é código no
+repositório; **medido** é a bancada ou a prova de RLS dizendo que funciona;
+**validado** é alguém tendo usado aquilo num aparelho de verdade. O `ESTADO.md`
+tem o quadro item por item.
 
-**Fase 2** — Web Push com VAPID e cron diário no GitHub Actions: **escrito e
-medido na bancada, ainda não validado em produção** — nenhuma notificação
-chegou a nenhum aparelho até agora, e falta o Secret `SUPABASE_SERVICE_ROLE`.
-O `ESTADO.md` separa, item por item, o que está implementado, o que está
-testado e o que já foi validado no aparelho. Falta o bot do Telegram como
-redundância e o offline com IndexedDB.
+**Fase 1 — escrita, medida e validada.** Estrutura e SQL; login por e-mail e
+senha; tela do mês agrupada por dia de vencimento; toque único marca e desmarca
+pago; selo "pago por fulano, 14:32"; cabeçalho fixo com previsto / pago / a
+pagar e a contagem de itens em aberto sem valor; editar valor; adicionar conta
+avulsa; apagar conta segurando o dedo; navegar entre meses; PWA instalável;
+contas fixas com geração do mês (que era da fase 3 e veio para cá, porque sem
+ela o app perdia do app de notas no dia 1º).
+
+Uma coisa da fase 1 continua **sem validação**: o **sync em tempo real entre
+dois aparelhos**. A bancada prova que o app reage ao evento; ninguém provou
+ainda que o evento atravessa a rede.
+
+**Fase 2 — escrita e medida, não validada.** Web Push com VAPID e cron diário
+no GitHub Actions. **Nenhuma notificação chegou a nenhum aparelho até agora**, e
+falta o Secret `SUPABASE_SERVICE_ROLE`. Há um aparelho inscrito no banco.
+Continuam por fazer o bot do Telegram, como redundância, e o offline com
+IndexedDB.
 
 O aviso é **um por dia, e só quando há o que dizer**: dia sem conta vencendo e
 sem atraso não gera notificação nenhuma. Notificação que chega todo dia sem
 motivo é notificação que a pessoa aprende a ignorar.
 
-**Fase 3** — modelos recorrentes e geração automática do mês, parcelas,
-gráficos, importação de histórico, receitas.
+**Fase 0 — auditoria e estabilização, feita depois das outras duas.** Bancada
+que sabe ficar vermelha e roda no CI, `npm ci` com lockfile, quatro furos de
+RLS e de permissão fechados no SQL. Sem funcionalidade nova. Os consertos de
+SQL só valem no banco depois de rodar os arquivos de novo — está no `ESTADO.md`.
 
-Fora da fase 1 nada disso é implementado nem preparado.
+**Fase 3 — nada começado, nada preparado de véspera.** Parcelas (hoje o buraco
+conhecido: cinco contas não são mensais para sempre e voltam todo mês),
+geração automática do mês sem apertar botão, gráficos, importação de histórico,
+receitas.
