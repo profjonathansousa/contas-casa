@@ -581,7 +581,14 @@ e é ela que mede se o remédio funcionou.
 
 ## Bloco 7 — três avisos, um por pessoa (05/09/2026)
 
-**Escrito e medido. Espera `sql/08` e merge.**
+**No ar desde 05/09/2026.** `sql/08_avisos_por_pessoa.sql` aplicado no banco
+**antes** do merge, como manda a regra de ordem registrada adiante; branch
+mesclada na `main` em seguida.
+
+Conferido no banco depois de aplicar: três colunas novas no `perfil`, as duas
+pessoas com os três avisos ligados (é o padrão), e `resumo_do_dia` continua
+`security invoker`, com `search_path` fixo, sem execução para `anon` e com
+execução para `authenticated` e para o robô.
 
 Até aqui o robô montava **uma mensagem por casa** e mandava para todos os
 aparelhos dela. Quem paga a maioria das contas é a Marina, e ela quer só o
@@ -668,13 +675,30 @@ texto certo para cada slot, e os três interruptores na tela — inclusive o
 controle de que mexer em preferência de aviso não encosta em lançamento
 nenhum.
 
-### O que falta para o bloco 7 valer
+### O que falta para o bloco 7 estar provado
 
-1. Rodar `sql/08_avisos_por_pessoa.sql` no banco.
-2. Mesclar.
-3. **A Marina entrar no app** e ligar os avisos no iPhone dela — sem isso não
+Código e banco estão prontos; o que falta é gente e aparelho.
+
+1. **A Marina entrar no app** e ligar os avisos no iPhone dela — sem isso não
    há para onde mandar as 20h. Depois é ela quem desliga os dois que não quer,
    na própria tela.
+2. **Ver o aviso de véspera chegar.** Actions > "Aviso diário das contas" >
+   Run workflow, escolhendo `vespera_20h` e marcando **seco** para conferir o
+   texto sem mandar; depois sem o seco.
+3. **Ver os três interruptores** no rodapé do app, no iPhone.
+
+### O que o cron mostrou no dia do merge
+
+O run de 05/09 disparou às 13:35 UTC (10:35 de Brasília) **com o arquivo
+antigo** — `head_sha 75cfa6c` —, porque a hora de disparo caiu antes do merge
+do bloco 6. Foi o sistema velho, 2h35 atrasado, e não mede nada sobre o
+remédio. A primeira execução do cron novo é às 15:17 UTC.
+
+Detalhe do dia: às 14:40 UTC o `resumo_do_dia` já devolvia **zero linhas** — as
+seis contas que venciam hoje foram pagas depois do aviso da manhã. Então a
+primeira execução do cron novo provavelmente **não vai mandar nada**, e estará
+certa ao não mandar. Medir a pontualidade vai exigir um dia com conta em
+aberto.
 
 ## Roadmap — blocos 6 a 9
 
