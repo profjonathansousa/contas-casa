@@ -58,7 +58,7 @@ A terceira coluna é a que quase sempre falta.
 | **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
 | **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
 | **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
-| **contas que acabam (parcelas)** | sim (bloco 9) | sim (114/4/23/45) | **não — espera `sql/09` e merge** |
+| **contas que acabam (parcelas)** | sim (bloco 9) | sim (114/4/23/45) | **não — no ar, mas nenhuma conta foi marcada como parcelada ainda** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -792,7 +792,15 @@ sempre: conta sem `parcelas_total` continua vindo todo mês, para sempre.
 
 ## Bloco 9 — contas que acabam (05/09/2026)
 
-**Escrito e medido. Espera `sql/09` e merge.**
+**No ar desde 05/09/2026.** `sql/09_parcelas.sql` aplicado no banco **antes**
+do merge; branch mesclada em seguida.
+
+Conferido no banco depois de aplicar: duas colunas novas na `modelo`, duas no
+`lancamento`, a janela fazendo conta certa (parcela 1 no mês da primeira, 12 na
+décima segunda, 13 fora do intervalo, nulo para conta mensal), um gatilho só na
+`modelo` e nenhuma fixa parcelada ainda. Provado também que o gatilho normaliza
+o mês da primeira parcela: um insert com `2026-03-17` foi gravado como
+`2026-03-01`, e a prova foi desfeita por `raise exception`, sem deixar linha.
 
 O buraco estava registrado desde o começo, em "Buraco conhecido": cinco contas
 não são mensais para sempre — acordos parcelados, uma parcela de imposto, um
@@ -857,11 +865,10 @@ propósito, como o "Jonathan" que também é só um rótulo da bancada.
 
 ### O que falta
 
-1. Rodar `sql/09_parcelas.sql` no banco — **antes do merge**, pela mesma razão
-   do bloco 7: o `app.js` passa a pedir as colunas novas.
-2. Mesclar.
-3. **Preencher as cinco contas** que já existem, pela tela. Quais são elas está
-   no banco e na conversa, **não aqui**.
+**Preencher as cinco contas** que já existem, pela tela: abrir "contas fixas",
+tocar na linha "todo dia N" de cada uma e dizer quantas parcelas e o mês da
+primeira. Quais são elas está no banco e na conversa, **não aqui**. Enquanto
+isso não for feito, o bloco 9 está no ar sem estar em uso.
 
 ## VALIDAÇÕES MANUAIS PENDENTES
 
@@ -887,12 +894,35 @@ ou do painel do Supabase.
    apontada pelo linter: hoje está desligada, e é um clique.
 8. **Decidir o destino de `public.cron_push_inscricao`.**
 
+## O primeiro run do robô novo, medido (05/09/2026)
+
+A pergunta que o bloco 6 existia para responder tem resposta:
+
+| medição | resultado |
+|---|---|
+| agendado para | 15:17 UTC |
+| disparou às | 17:20:54 UTC — **2h04 de atraso** |
+| hora de Brasília lida pelo robô | 14h |
+| slot que ele abriu | `dia_12h` (12 ≤ 14 < 18) |
+| pessoas percorridas | 2 |
+| enviados | 0 — nada a dizer, tudo pago |
+
+**O minuto torto não resolveu a pontualidade** — de 3h35–4h15 caiu para 2h04, e
+continua na casa das horas. **O que resolveu foi decidir pelo relógio de
+Brasília em vez da hora do gatilho:** o slot do meio-dia ainda estava aberto às
+14h, então o atraso foi absorvido em vez de virar aviso perdido. Se o conserto
+tivesse sido só mudar o minuto do cron, o aviso de hoje teria se perdido.
+
+`pessoas: 2` é o laço por pessoa do bloco 7 rodando em produção pela primeira
+vez, lendo as colunas novas do perfil sem erro.
+
 ## PRÓXIMA AÇÃO EXATA
 
 1. **Conferir no Actions a que horas os runs de hoje dispararam** e se o aviso
    chegou perto do meio-dia. É a medição que decide se o GitHub serve ou se a
    conversa do `pg_cron` volta. Primeira execução do cron novo: 15:17 UTC.
-2. **Rodar `sql/08_avisos_por_pessoa.sql` e mesclar o bloco 7.**
+2. ~~Rodar `sql/08` e mesclar o bloco 7.~~ **Feito.** ~~E o `sql/09` do bloco
+   9.~~ **Feito.**
 3. **A segunda pessoa da casa entra no app** e liga os avisos no iPhone dela.
    Sem isso o bloco 7 não tem para onde mandar as 20h.
 4. **Realtime com dois aparelhos** — a última coisa da fase 1 sem prova.
