@@ -104,14 +104,20 @@ function valeNoMes(m, competencia) {
   return n === null || (n >= 1 && n <= m.parcelas_total);
 }
 
-// "03/2026", "3/2026", "3-2026" -> "2026-03-01". Vazio = sem parcelas.
-// Rabisco devolve NaN, mesma convenção do paraNumero.
+// "03/2026", "3/2026", "3-2026" e tambem "032026" e "32026" -> "2026-03-01".
+// Os digitos soltos valem tanto quanto a forma com barra porque o campo pede
+// teclado numerico, e o teclado numerico do iPhone NAO tem barra: exigir a
+// barra ali era pedir uma tecla que a pessoa nao tem.
+// Vazio = sem parcelas. Rabisco devolve NaN, mesma convenção do paraNumero.
 function paraCompetencia(txt) {
-  var s = String(txt == null ? '' : txt).trim();
+  var s = String(txt == null ? '' : txt).trim().replace(/\s/g, '');
   if (!s) return null;
-  var m = /^(\d{1,2})\s*[\/\-.]\s*(\d{4})$/.exec(s);
-  if (!m) return NaN;
-  var mes = +m[1], ano = +m[2];
+  var mes, ano;
+  var comBarra  = /^(\d{1,2})[\/\-.](\d{4})$/.exec(s);
+  var soDigitos = /^(\d{1,2})(\d{4})$/.exec(s);
+  if (comBarra)       { mes = +comBarra[1];  ano = +comBarra[2]; }
+  else if (soDigitos) { mes = +soDigitos[1]; ano = +soDigitos[2]; }
+  else return NaN;
   if (mes < 1 || mes > 12) return NaN;
   return ano + '-' + String(mes).padStart(2, '0') + '-01';
 }
@@ -623,6 +629,13 @@ function fecharParcelas() {
   el.fundoParcelas.hidden = true;
   el.folhaParcelas.hidden = true;
 }
+// Sair do campo mostra o que o app entendeu: quem digitou 92026 vê 09/2026 e
+// sabe que acertou, sem precisar salvar para descobrir.
+el.pcMes.addEventListener('blur', function () {
+  var c = paraCompetencia(el.pcMes.value);
+  if (typeof c === 'string') el.pcMes.value = deCompetencia(c);
+});
+
 el.pcCancelar.addEventListener('click', fecharParcelas);
 el.fundoParcelas.addEventListener('click', fecharParcelas);
 
@@ -637,7 +650,7 @@ el.folhaParcelas.addEventListener('submit', async function (ev) {
   var total = bruto === '' ? null : parseInt(bruto, 10);
   var mes = paraCompetencia(el.pcMes.value);
 
-  if (typeof mes === 'number' && isNaN(mes)) { erro('Não entendi o mês. Use mm/aaaa.'); return; }
+  if (typeof mes === 'number' && isNaN(mes)) { erro('Não entendi o mês. Use 09/2026 ou 092026.'); return; }
   if (total !== null && !(total >= 1 && total <= 360)) { erro('Quantas parcelas? Um número de 1 a 360.'); return; }
   // uma sem a outra não diz nada: "12 vezes" a partir de quando?
   if ((total === null) !== (mes === null)) { erro('Preencha os dois, ou deixe os dois vazios.'); return; }

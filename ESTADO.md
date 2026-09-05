@@ -58,7 +58,7 @@ A terceira coluna é a que quase sempre falta.
 | **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
 | **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
 | **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
-| **contas que acabam (parcelas)** | sim (bloco 9) | sim (114/4/23/45) | **não — no ar, mas nenhuma conta foi marcada como parcelada ainda** |
+| **contas que acabam (parcelas)** | sim (bloco 9) | sim (121/4/23/45) | **não — no ar, mas nenhuma conta foi marcada como parcelada ainda** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -830,16 +830,36 @@ mês", e o `gerar_mes()` para de trazê-la quando a última passou.
 - **O gesto novo:** tocar na linha "todo dia 8" da conta fixa abre a folha de
   parcelas. Era a única parte da linha que não fazia nada. O toque para lá
   **não pode** ligar nem desligar a fixa — isso é medido.
-- **O mês é digitado como `mm/aaaa`**, não em `<input type="month">`: o Safari
-  do iPhone não é confiável nesse tipo de campo. A leitura é função pura e
-  recusa rabisco.
+- **O mês é digitado à mão**, não em `<input type="month">`: o Safari do iPhone
+  não é confiável nesse tipo de campo. A leitura é função pura e recusa
+  rabisco.
+
+### Conserto no mesmo dia: a barra que o teclado não tem
+
+Jonathan tentou cadastrar a primeira conta parcelada e não conseguiu. O campo
+do mês pede **teclado numérico** — que é o certo, é um número —, e o teclado
+numérico do iPhone **não tem barra**. O `paraCompetencia()` exigia `mm/aaaa`.
+Ou seja: o app pedia uma tecla que a pessoa não tinha na tela.
+
+Conserto: os dígitos soltos passam a valer tanto quanto a forma com barra —
+`092026` e `92026` viram 09/2026 —, e **sair do campo mostra como foi
+entendido**, para não precisar salvar para descobrir. As formas com barra e com
+traço continuam valendo.
+
+A lição, que vale para o bloco 8: **escolher o teclado é escolher o alfabeto**.
+Pedir `inputmode="numeric"` e depois exigir pontuação é contradição, e nenhuma
+medida da bancada pegaria isso — ela digita direto no campo, sem teclado. Só
+aparece no aparelho, na mão de quem usa.
+
+Sete medidas novas, duas de controle negativo: aceitar dígito solto não pode
+virar aceitar qualquer coisa (mês 13 e ano sozinho continuam recusados).
 
 ### O que a bancada mede
 
 23 medidas novas, quatro delas controle negativo: parcelada que acabou some do
 "Trazer N contas fixas" e avisa "acabou, eram 3"; conta comum não ganha
 contador; um campo sem o outro não salva; mês rabiscado não passa. Placar:
-**114 / 4 / 23 / 45**, 0 falhas.
+**121 / 4 / 23 / 45**, 0 falhas.
 
 De quebra, a auditoria do placar pegou uma dívida da rodada anterior: o
 `rodar.sh` já exigia 45 no quarto bloco, mas o README e o `testes/LEIA.md`

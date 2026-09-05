@@ -16,7 +16,7 @@ O `node` não sabe esvaziar a fila de microtarefas no meio de uma medição, que
 e o `readFile`), e por isso o `rodar.sh` chama o node com
 `--allow-natives-syntax`. A ponte não finge nada do app.
 
-Cada bloco termina em número. O placar tem que fechar em **114 / 4 / 23 / 45**
+Cada bloco termina em número. O placar tem que fechar em **121 / 4 / 23 / 45**
 medidas e **0 falhas**. O `rodar.sh` confere isso sozinho e sai com código
 diferente de zero se qualquer medida falhar, se o motor morrer ou se o placar
 mudar — antes ele saía zero mesmo com a bancada vermelha, e um CI assim seria

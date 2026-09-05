@@ -63,7 +63,8 @@ conta já digitada na mão também não vem repetida.
 
 **Conta que acaba.** Acordo parcelado, parcela de imposto, material escolar —
 o que vem doze vezes e para. Toque na linha "todo dia 8" de uma conta fixa e
-diga quantas vezes e o mês da primeira; a partir daí ela vem sozinha enquanto
+diga quantas vezes e o mês da primeira — no mês dá para digitar só os números,
+`092026` vira 09/2026; a partir daí ela vem sozinha enquanto
 vale, mostra "5/12" na tela do mês, e **para de ser oferecida quando a última
 passou**. Deixar os dois campos vazios é o normal: conta que se repete para
 sempre.
@@ -92,7 +93,7 @@ desliga cada um.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
 onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 114 / 4 / 23 / 45 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 121 / 4 / 23 / 45 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 

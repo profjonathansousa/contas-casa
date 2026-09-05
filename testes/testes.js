@@ -387,15 +387,51 @@ q('#pc-mes').value = '13/2026';
 q('#folha-parcelas').disparar('submit');
 esperar();
 medir('recusou o mes', LOG.updates.length - upQ, 0);
-medir('disse por que', q('#erro-parcelas')._txt, 'Não entendi o mês. Use mm/aaaa.');
+medir('disse por que', q('#erro-parcelas')._txt,
+      'Não entendi o mês. Use 09/2026 ou 092026.');
+
+print('\n  -- o teclado numerico do iPhone nao tem barra --');
+print('  (o campo pede teclado numerico; exigir a barra era pedir tecla que nao existe)');
+function salvarMes(texto) {
+  var antes = LOG.updates.length;
+  q('#pc-total').value = '12';
+  q('#pc-mes').value = texto;
+  q('#folha-parcelas').disparar('submit');
+  esperar();
+  return LOG.updates.length > antes ? LOG.updates[antes].valores.parcela_1 : 'recusou';
+}
+function reabrir() { fixaPorDesc('Condominio').filhos[1].filhos[1].disparar('click'); }
+
+reabrir();
+medir('092026 (so digitos)', salvarMes('092026'), '2026-09-01');
+reabrir();
+medir('92026 (mes de um digito)', salvarMes('92026'), '2026-09-01');
+reabrir();
+medir('09/2026 (com barra) continua valendo', salvarMes('09/2026'), '2026-09-01');
+reabrir();
+medir('09-2026 (com traco) tambem', salvarMes('09-2026'), '2026-09-01');
+
+print('\n  -- sair do campo mostra o que o app entendeu --');
+reabrir();
+q('#pc-mes').value = '92026';
+q('#pc-mes').disparar('blur');
+medir('92026 vira 09/2026 na tela', q('#pc-mes').value, '09/2026');
+
+print('\n  -- CONTROLE NEGATIVO --');
+print('  (aceitar digito solto nao pode virar aceitar qualquer coisa)');
+medir('mes 13 recusado', salvarMes('132026'), 'recusou');
+reabrir();
+medir('so o ano recusado', salvarMes('2026'), 'recusou');
+reabrir();
 
 print('\n  -- limpar os dois volta a ser mensal para sempre --');
+var upR = LOG.updates.length;
 q('#pc-total').value = '';
 q('#pc-mes').value = '';
 q('#folha-parcelas').disparar('submit');
 esperar();
 medir('mandou nulo nos dois',
-      [LOG.updates[upQ].valores.parcelas_total, LOG.updates[upQ].valores.parcela_1],
+      [LOG.updates[upR].valores.parcelas_total, LOG.updates[upR].valores.parcela_1],
       [null, null]);
 medir('e a fixa volta a ser so "todo dia"', subtitulo(fixaPorDesc('Condominio')), 'todo dia 31');
 
