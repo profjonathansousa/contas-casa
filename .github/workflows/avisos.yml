@@ -2,16 +2,35 @@ name: Aviso diário das contas
 
 on:
   schedule:
-    # 11:00 UTC = 08:00 em Brasília. O cron do GitHub entra numa fila e
-    # costuma atrasar de dez a sessenta minutos; não conte com pontualidade.
-    - cron: '0 11 * * *'
+    # O cron do GitHub NÃO é pontual. Medido neste repositório em quatro dias
+    # seguidos: agendado para 11:00 UTC, disparou às 14:35, 14:44, 14:45 e
+    # 15:15 -- de 3h35 a 4h15 de atraso. Duas providências:
+    #
+    #   1. minuto torto. O :00 é onde todo mundo agenda, e é onde a fila é
+    #      pior.
+    #   2. de hora em hora, e quem decide o que mandar é o relógio de
+    #      Brasília dentro do enviar.mjs. Run atrasado ainda manda; a tabela
+    #      aviso_enviado impede que mande duas vezes.
+    #
+    # 15:17-23:17 UTC = 12:17-20:17 de Brasília (cobre os dois avisos).
+    - cron: '17 15-23 * * *'
+    # 00:17 e 01:17 UTC = 21:17 e 22:17 de Brasília, ainda do dia anterior.
+    # É a repescagem do aviso das 20h, e para aí: aviso de conta não chega de
+    # madrugada.
+    - cron: '17 0-1 * * *'
   workflow_dispatch:
     inputs:
       dia:
         description: 'Data a simular (aaaa-mm-dd). Vazio = hoje.'
         required: false
+      slot:
+        description: 'Forçar um aviso, ignorando a hora'
+        required: false
+        type: choice
+        options: ['', 'dia_12h', 'dia_20h']
+        default: ''
       seco:
-        description: 'Só mostrar o que enviaria, sem enviar'
+        description: 'Só mostrar o que enviaria, sem enviar nem registrar'
         type: boolean
         default: false
 
@@ -38,5 +57,6 @@ jobs:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT:     ${{ secrets.VAPID_SUBJECT }}
           DIA:  ${{ inputs.dia }}
+          SLOT: ${{ inputs.slot }}
           SECO: ${{ inputs.seco && '1' || '' }}
         run: node enviar.mjs

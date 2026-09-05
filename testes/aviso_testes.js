@@ -1,9 +1,11 @@
-/* Mede o texto do aviso. Não reimplementa nada: recorta do enviar.mjs real
-   as duas funções puras (dinheiro e montarAviso) e roda elas. */
+/* Mede o texto do aviso e a escolha do slot. Não reimplementa nada: recorta do
+   enviar.mjs real a faixa marcada como pura e roda ela.
+   A marca é explícita no arquivo -- antes o recorte ia de "const dinheiro" ate
+   "const resumos", e qualquer renomeacao silenciosa quebrava a bancada. */
 var fonte = readFile(DIR_APP + '/avisos/enviar.mjs');
-var ini = fonte.indexOf('const dinheiro');
-var fim = fonte.indexOf('const resumos');
-if (ini < 0 || fim < 0 || fim <= ini) throw new Error('nao achei as funcoes no enviar.mjs');
+var ini = fonte.indexOf('// ==== funções puras');
+var fim = fonte.indexOf('// ==== fim das funções puras');
+if (ini < 0 || fim < 0 || fim <= ini) throw new Error('nao achei a faixa pura no enviar.mjs');
 eval(fonte.slice(ini, fim));
 
 var ok = 0, falhou = 0;
@@ -56,5 +58,45 @@ medir('virgula decimal e ponto de milhar',
       montarAviso({ dia: '2026-09-01', vencem_hoje: 0, valor_hoje: 0,
                     atrasadas: 21, valor_atrasado: 9876.54, sem_valor: 0, titulos: null }).corpo,
       'R$ 9.876,54');
+
+print('\n== que horas sao em Brasilia ==');
+print('  (o Actions roda em UTC; quem manda no aviso e o relogio daqui)');
+
+function emBR(ano, mes0, dia, horaUTC, min) {
+  return emSaoPaulo(new Date(Date.UTC(ano, mes0, dia, horaUTC, min || 0)));
+}
+medir('23:10 UTC -> dia',  emBR(2026, 8, 5, 23, 10).dia, '2026-09-05');
+medir('23:10 UTC -> hora', emBR(2026, 8, 5, 23, 10).hora, 20);
+
+print('\n  -- a virada do dia em UTC nao vira o dia aqui --');
+print('  (a repescagem do aviso das 20h cai depois da meia-noite em UTC)');
+medir('01:17 UTC do dia 6 ainda e dia 5 aqui', emBR(2026, 8, 6, 1, 17).dia, '2026-09-05');
+medir('e sao 22h',                             emBR(2026, 8, 6, 1, 17).hora, 22);
+
+print('\n  -- CONTROLE: meia-noite e 0, nao 24 --');
+print('  (Intl devolve "24" em alguns motores; se voltar 24, o slot da noite nunca fecha)');
+medir('meia-noite', emBR(2026, 8, 6, 3, 5).hora, 0);
+
+print('\n== qual aviso esta aberto ==');
+medir('11h: cedo demais',      slotsAbertos(11), []);
+medir('12h: abre o do almoco', slotsAbertos(12), ['dia_12h']);
+medir('17h: ainda vale',       slotsAbertos(17), ['dia_12h']);
+medir('20h: abre o da noite',  slotsAbertos(20), ['dia_20h']);
+medir('23h: ainda vale',       slotsAbertos(23), ['dia_20h']);
+
+print('\n  -- CONTROLE NEGATIVO --');
+print('  (aviso atrasado tem hora para deixar de fazer sentido; senao chega de madrugada)');
+medir('18h: o do almoco ja expirou', slotsAbertos(18), []);
+medir('meia-noite: nada abre',       slotsAbertos(0), []);
+medir('3h da manha: nada abre',      slotsAbertos(3), []);
+
+print('\n== a tag separa os dois avisos do mesmo dia ==');
+print('  (mesma tag faria o da noite apagar o do almoco na tela do celular)');
+var base = montarAviso({ dia: '2026-09-10', vencem_hoje: 1, valor_hoje: 10,
+  atrasadas: 0, valor_atrasado: 0, sem_valor: 0, titulos: ['Luz'] }).tag;
+medir('tag do almoco', tagDoSlot(base, 'dia_12h'), 'resumo-2026-09-10-dia_12h');
+medir('tag da noite',  tagDoSlot(base, 'dia_20h'), 'resumo-2026-09-10-dia_20h');
+medir('e as duas sao diferentes',
+      tagDoSlot(base, 'dia_12h') !== tagDoSlot(base, 'dia_20h'), true);
 
 print('\nmedidas ok: ' + ok + '   falhas: ' + falhou);

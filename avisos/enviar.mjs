@@ -2,18 +2,25 @@
    Roda no GitHub Actions, nunca no navegador. Usa a chave de serviço, que
    ignora a RLS de propósito: precisa enxergar todas as casas.
 
+   O cron do GitHub atrasa horas, não minutos. Por isso este robô roda de hora
+   em hora e decide sozinho, pelo relógio de Brasília, qual aviso está aberto;
+   a tabela aviso_enviado é a memória que impede mandar o mesmo aviso duas
+   vezes. Run atrasado ainda manda, desde que o aviso ainda faça sentido.
+
    Variáveis esperadas:
      SUPABASE_URL, SUPABASE_SERVICE_ROLE,
      VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
    Opcionais:
      DIA=2026-09-10   força a data (para testar)
-     SECO=1           calcula e mostra, mas não envia nada
+     SLOT=dia_12h     força o slot, ignorando a hora (para testar)
+     SECO=1           calcula e mostra, mas não envia nem registra
 */
 import webpush from 'web-push';
 
 const URL_BASE = process.env.SUPABASE_URL;
 const CHAVE    = process.env.SUPABASE_SERVICE_ROLE;
 const DIA      = process.env.DIA || null;
+const SLOT     = process.env.SLOT || null;
 const SECO     = process.env.SECO === '1';
 
 if (!URL_BASE || !CHAVE) { console.error('Faltam SUPABASE_URL / SUPABASE_SERVICE_ROLE.'); process.exit(1); }
@@ -39,10 +46,21 @@ const cabecalho = {
 };
 
 async function api(caminho, opcoes = {}) {
-  const r = await fetch(URL_BASE + '/rest/v1' + caminho, { ...opcoes, headers: cabecalho });
-  if (!r.ok) throw new Error(caminho + ' -> ' + r.status + ' ' + (await r.text()).slice(0, 200));
-  return r.status === 204 ? null : r.json();
+  const r = await fetch(URL_BASE + '/rest/v1' + caminho, {
+    ...opcoes,
+    headers: { ...cabecalho, ...(opcoes.headers || {}) }
+  });
+  if (!r.ok) {
+    const erro = new Error(caminho + ' -> ' + r.status + ' ' + (await r.text()).slice(0, 200));
+    erro.status = r.status;
+    throw erro;
+  }
+  // PostgREST devolve corpo vazio em 201 e 204; JSON.parse('') estoura.
+  const texto = await r.text();
+  return texto ? JSON.parse(texto) : null;
 }
+
+// ==== funções puras: a bancada recorta daqui ====
 
 const dinheiro = (v) =>
   'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -73,6 +91,55 @@ function montarAviso(r) {
   return { titulo, corpo: partes.join(' · '), tag: 'resumo-' + r.dia };
 }
 
+// Cada aviso abre numa hora e deixa de fazer sentido em outra. "Vence hoje"
+// mandado à meia-noite chegou tarde demais para servir de aviso e cedo demais
+// para ser educado; melhor não mandar. É isso que "expira" quer dizer aqui.
+// Horas de Brasília, e o intervalo é aberto no fim: abre <= hora < expira.
+const SLOTS = {
+  dia_12h: { abre: 12, expira: 18 },
+  dia_20h: { abre: 20, expira: 24 }
+};
+
+function slotsAbertos(hora) {
+  return Object.keys(SLOTS).filter(function (s) {
+    return hora >= SLOTS[s].abre && hora < SLOTS[s].expira;
+  });
+}
+
+// Dia e hora em São Paulo, sem depender do relógio da máquina que roda o robô
+// (o Actions roda em UTC). O dia é o de Brasília de propósito: a repescagem do
+// aviso das 20h cai depois da meia-noite em UTC e ainda é o mesmo dia aqui.
+function emSaoPaulo(quando) {
+  const p = {};
+  const partes = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', hourCycle: 'h23'
+  }).formatToParts(quando);
+  for (const parte of partes) p[parte.type] = parte.value;
+  return { dia: p.year + '-' + p.month + '-' + p.day, hora: Number(p.hour) };
+}
+
+// O aviso das 20h não pode substituir o do meio-dia na tela do celular: são
+// dois recados diferentes. Tag diferente por slot.
+function tagDoSlot(tagBase, slot) {
+  return tagBase + '-' + slot;
+}
+
+// ==== fim das funções puras ====
+
+const agora = emSaoPaulo(new Date());
+const dia = DIA || agora.dia;
+const slots = SLOT ? [SLOT] : slotsAbertos(agora.hora);
+
+console.log(`Brasília: ${agora.dia} ${String(agora.hora).padStart(2, '0')}h | dia do aviso: ${dia} | `
+          + `slots abertos: ${slots.join(', ') || 'nenhum'}${SECO ? ' | SECO' : ''}`);
+
+if (slots.length === 0) {
+  console.log('nada a fazer nesta hora.');
+  process.exit(0);
+}
+
 const resumos = await api('/rpc/resumo_do_dia', {
   method: 'POST',
   body: JSON.stringify(DIA ? { p_dia: DIA } : {})
@@ -81,41 +148,68 @@ const inscricoes = await api('/push_inscricao?select=id,casa_id,endpoint,p256dh,
 
 console.log(`casas com conta em aberto: ${resumos.length} | aparelhos inscritos: ${inscricoes.length}`);
 
-let enviados = 0, limpos = 0, falhos = 0, semAviso = 0;
+let enviados = 0, limpos = 0, falhos = 0, semAviso = 0, repetidos = 0;
 
-for (const r of resumos) {
-  const aviso = montarAviso(r);
-  if (!aviso) { semAviso++; continue; }
-  const alvos = inscricoes.filter((i) => i.casa_id === r.casa_id);
-  console.log(`casa ${r.casa_id.slice(0, 8)} | ${alvos.length} aparelho(s) | ${aviso.titulo} — ${aviso.corpo}`);
-  if (SECO) continue;
+for (const slot of slots) {
+  const registro = await api(`/aviso_enviado?dia=eq.${dia}&slot=eq.${slot}&select=casa_id`);
+  const jaFoi = new Set((registro || []).map((x) => x.casa_id));
 
-  for (const i of alvos) {
-    const alvo = { endpoint: i.endpoint, keys: { p256dh: i.p256dh, auth: i.auth } };
-    try {
-      await webpush.sendNotification(alvo, JSON.stringify(aviso), { TTL: 12 * 3600 });
-      enviados++;
-      await api('/push_inscricao?id=eq.' + i.id, {
-        method: 'PATCH',
-        body: JSON.stringify({ ultimo_envio: new Date().toISOString(), falhas: 0, ultimo_erro: null })
-      });
-    } catch (e) {
-      // 404 e 410 querem dizer "esse aparelho não existe mais". Apaga, não insiste.
-      if (e.statusCode === 404 || e.statusCode === 410) {
-        await api('/push_inscricao?id=eq.' + i.id, { method: 'DELETE' });
-        limpos++;
-        console.log('  inscrição morta, removida');
-      } else {
-        falhos++;
-        console.log('  falhou: ' + (e.statusCode || '') + ' ' + (e.message || '').slice(0, 120));
+  for (const r of resumos) {
+    if (jaFoi.has(r.casa_id)) { repetidos++; continue; }
+
+    const aviso = montarAviso(r);
+    if (!aviso) { semAviso++; continue; }
+    aviso.tag = tagDoSlot(aviso.tag, slot);
+
+    const alvos = inscricoes.filter((i) => i.casa_id === r.casa_id);
+    console.log(`[${slot}] casa ${r.casa_id.slice(0, 8)} | ${alvos.length} aparelho(s) | ${aviso.titulo} — ${aviso.corpo}`);
+    if (SECO) continue;
+
+    let algumChegou = false;
+    for (const i of alvos) {
+      const alvo = { endpoint: i.endpoint, keys: { p256dh: i.p256dh, auth: i.auth } };
+      try {
+        await webpush.sendNotification(alvo, JSON.stringify(aviso), { TTL: 12 * 3600 });
+        enviados++;
+        algumChegou = true;
         await api('/push_inscricao?id=eq.' + i.id, {
           method: 'PATCH',
-          body: JSON.stringify({ ultimo_erro: String(e.statusCode || e.message).slice(0, 200) })
+          body: JSON.stringify({ ultimo_envio: new Date().toISOString(), falhas: 0, ultimo_erro: null })
         });
+      } catch (e) {
+        // 404 e 410 querem dizer "esse aparelho não existe mais". Apaga, não insiste.
+        if (e.statusCode === 404 || e.statusCode === 410) {
+          await api('/push_inscricao?id=eq.' + i.id, { method: 'DELETE' });
+          limpos++;
+          console.log('  inscrição morta, removida');
+        } else {
+          falhos++;
+          console.log('  falhou: ' + (e.statusCode || '') + ' ' + (e.message || '').slice(0, 120));
+          await api('/push_inscricao?id=eq.' + i.id, {
+            method: 'PATCH',
+            body: JSON.stringify({ ultimo_erro: String(e.statusCode || e.message).slice(0, 200) })
+          });
+        }
+      }
+    }
+
+    // Só marca como enviado se alguma coisa chegou a algum aparelho: se todos
+    // falharam, o run da hora seguinte tem que tentar de novo.
+    if (algumChegou) {
+      try {
+        await api('/aviso_enviado', {
+          method: 'POST',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ casa_id: r.casa_id, dia, slot })
+        });
+      } catch (e) {
+        // 409 = outro run registrou primeiro. Não é erro.
+        if (e.status !== 409) throw e;
       }
     }
   }
 }
 
-console.log(`enviados: ${enviados} | inscrições mortas removidas: ${limpos} | falhas: ${falhos} | casas sem nada a avisar: ${semAviso}`);
+console.log(`enviados: ${enviados} | inscrições mortas removidas: ${limpos} | falhas: ${falhos} | `
+          + `casas sem nada a avisar: ${semAviso} | já avisadas nesta hora: ${repetidos}`);
 if (falhos > 0) process.exitCode = 1;

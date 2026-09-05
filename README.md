@@ -30,7 +30,8 @@ CONTAS_CASA/
 │   ├── 03_seed_ficticio.sql   dados de mentira, opcional, só para ver a tela
 │   ├── 04_prova_rls.sql       prova a RLS fingindo ser um usuário autenticado
 │   ├── 05_modelos.sql         contas fixas + gerar_mes() + fixar_mes()
-│   └── 06_push.sql            inscrições de aviso + resumo_do_dia()
+│   ├── 06_push.sql            inscrições de aviso + resumo_do_dia()
+│   └── 07_avisos.sql          memória de aviso enviado (um por dia e por slot)
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -74,7 +75,7 @@ do mês volta para o mês corrente.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
 onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 81 / 4 / 23 / 11 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 81 / 4 / 23 / 27 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -140,11 +141,15 @@ GitHub Actions. O Secret está posto, o cron roda todo dia e **a notificação
 chega no iPhone** (último envio registrado: 03/09/2026). Dia sem conta vencendo
 e sem atraso não gera aviso — e é isso que explica um dia de silêncio no meio.
 
-Um defeito conhecido, e grande: **o cron do GitHub atrasa horas, não minutos.**
-Medido neste repositório em quatro execuções seguidas: agendado para 11:00 UTC
-(08:00 de Brasília), disparou às 14:35, 14:44, 14:45 e 15:15 UTC — de 3h35 a
-4h15 de atraso. Enquanto o aviso é um só e de manhã, isso incomoda pouco;
-qualquer aviso com hora marcada precisa resolver isso antes.
+**O cron do GitHub atrasa horas, não minutos.** Medido neste repositório em
+quatro execuções seguidas: agendado para 11:00 UTC (08:00 de Brasília),
+disparou às 14:35, 14:44, 14:45 e 15:15 UTC — de 3h35 a 4h15 de atraso. A
+saída, no bloco 6, foi parar de confiar no horário do cron: ele roda de hora em
+hora, em minuto torto, e quem decide o que mandar é o relógio de Brasília
+dentro do `enviar.mjs`. Cada aviso tem hora para abrir e hora para deixar de
+fazer sentido — conta que vence hoje não chega de madrugada —, e a tabela
+`aviso_enviado` garante um aviso por casa, por dia e por slot, mesmo com o robô
+rodando doze vezes.
 
 Continuam por fazer o bot do Telegram, como redundância, e o offline com
 IndexedDB.

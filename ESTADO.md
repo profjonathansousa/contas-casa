@@ -23,7 +23,8 @@ A terceira coluna é a que quase sempre falta.
 | **Realtime entre dois aparelhos** | sim | só o lado do app, com evento fabricado | **não** |
 | **Web Push: inscrever o aparelho** | sim | não (não dá para medir fora do navegador) | sim: 1 inscrição no banco |
 | **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **sim — chegou no iPhone; último envio 03/09/2026** |
-| **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasa de 3h35 a 4h15** |
+| **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
+| **slots de aviso por hora de Brasília** | sim (bloco 6) | sim (27 medidas) | **não — espera merge e `sql/07`** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -494,6 +495,146 @@ beneficiário e valor. Ficam sob a mesma RLS, passam a estar também no cache do
 **Parcelas.** Cinco contas voltam todo mês e Jonathan desliga na mão. Nenhum
 dos três blocos acima encosta nisso.
 
+## Bloco 6 — pontualidade do agendador (05/09/2026)
+
+**Feito.** Espera merge e um SQL.
+
+O problema, medido: o cron do GitHub agendado para 11:00 UTC disparou às 14:35,
+14:44, 14:45 e 15:15 em quatro dias seguidos. Não dá para prometer "20h" em
+cima disso.
+
+A saída foi **parar de confiar no horário do cron**:
+
+- ele roda **de hora em hora, no minuto 17** (o `:00` é onde todo mundo agenda
+  e onde a fila é pior), das 12:17 às 20:17 de Brasília, mais 21:17 e 22:17 de
+  repescagem;
+- quem decide o que mandar é o **relógio de Brasília dentro do `enviar.mjs`**,
+  não a hora em que o run acordou;
+- cada aviso tem hora para **abrir** e hora para **deixar de fazer sentido**.
+  Conta que vence hoje avisada à meia-noite chegou tarde demais para servir e
+  cedo demais para ser educada: melhor não mandar. O do meio-dia expira às 18h;
+  o das 20h, à meia-noite;
+- `sql/07_avisos.sql` cria `aviso_enviado`, a memória que impede o robô de
+  mandar o mesmo aviso doze vezes por dia. Um por casa, por dia e por slot. RLS
+  ligada e forçada, **sem política e sem grant**: ninguém do app lê nem
+  escreve, só o robô com a chave de serviço.
+
+Detalhes que valem estar escritos:
+
+- **O dia do registro é o de Brasília, não o de UTC.** A repescagem das 21h e
+  22h cai depois da meia-noite em UTC e ainda é o mesmo dia aqui. Errar isso
+  faria o aviso das 20h ser mandado duas vezes.
+- **Só registra se algum aparelho recebeu.** Se todos falharam, o run da hora
+  seguinte tenta de novo.
+- **A tag muda por slot.** Mesma tag faria o aviso da noite apagar o do
+  meio-dia na tela do celular.
+- O aviso, que era um só de manhã, passa a ser dois: **12h e 20h**. O de
+  véspera é do bloco 7, que precisa de SQL novo.
+- A faixa de funções puras do `enviar.mjs` agora tem **marca explícita** no
+  arquivo. Antes a bancada recortava de `const dinheiro` até `const resumos`, e
+  renomear uma variável quebrava tudo sem explicar por quê.
+
+Bancada: **81 / 4 / 23 / 27**, 0 falhas. As 16 medidas novas cobrem a hora de
+Brasília (inclusive a virada do dia em UTC e a meia-noite, que alguns motores
+devolvem como "24" e faria o slot da noite nunca fechar), a abertura e a
+expiração de cada slot, e a tag por slot. Três são controle negativo: 18h,
+meia-noite e 3h da manhã não podem abrir aviso nenhum.
+
+**Ainda não aplicado no banco, de propósito.** `sql/07_avisos.sql` cria uma
+tabela que só a versão nova do robô usa, e a versão nova só roda depois do
+merge. Criar agora deixaria no banco uma tabela órfã — exatamente o que a fase
+0 criticou em `cron_push_inscricao`. **Rodar o `07` faz parte do merge.** Se
+esquecer, o workflow fica vermelho na primeira execução, o que é visível.
+
+## Roadmap — blocos 6 a 9
+
+| bloco | o que é | estado | depende de |
+|---|---|---|---|
+| **6** | pontualidade do agendador | **feito**, espera merge + `sql/07` | — |
+| **7** | três avisos, um por pessoa | próximo | bloco 6 e o login da esposa |
+| **9** | parcelas | desenhado abaixo | nada |
+| **8** | código de barras / PIX colado | desenhado | nada |
+
+Ordem recomendada: **6 → 7 → 9 → 8**. Parcelas passa na frente do código de
+pagamento por dois motivos: é o que custa trabalho manual todo mês, e uma conta
+parcelada que já acabou e continua voltando vira, com os avisos do bloco 7,
+**três alarmes falsos por dia**. Ou seja, o bloco 9 protege o 7.
+
+## Bloco 9 — parcelas (desenho, 05/09/2026)
+
+Isto nunca tinha sido desenhado. O que existia era só o enunciado, no "Buraco
+conhecido" mais acima: cinco contas de setembro não são mensais para sempre —
+são acordos parcelados, uma parcela de imposto e um material escolar —, e
+enquanto não houver controle de parcelas elas voltam todo mês e cabe a Jonathan
+desligá-las na mão quando acabarem.
+
+### A ideia, em uma frase
+
+Uma conta fixa passa a poder dizer **"sou 12 vezes, a partir de tal mês"**, e o
+`gerar_mes()` para de trazê-la quando a última passou.
+
+### Onde os dados moram
+
+Na `modelo` (a conta fixa), duas colunas, as duas anuláveis:
+
+- `parcelas_total int` — nulo quer dizer **mensal para sempre**, que é o caso
+  da maioria;
+- `parcela_1 date` — a competência da primeira parcela.
+
+A parcela do mês M é aritmética simples: `n = (ano(M) - ano(p1)) * 12 +
+(mês(M) - mês(p1)) + 1`. Entra no mês se `1 <= n <= parcelas_total`.
+
+Na `lancamento`, duas colunas preenchidas pelo `gerar_mes()`:
+`parcela_n` e `parcela_de`.
+
+### A armadilha que decide o desenho
+
+O caminho óbvio seria escrever "Acordo X (5/12)" na **descrição**. Não pode: a
+regra que impede o `gerar_mes()` de duplicar compara **por descrição**, e uma
+descrição que muda todo mês faria a mesma conta entrar de novo toda vez. Por
+isso o contador vai em coluna própria e a tela é que junta as duas coisas:
+`Acordo X · 5/12`.
+
+### O que muda em cada lugar
+
+- **`gerar_mes()`**: filtra pela janela e preenche `parcela_n` / `parcela_de`.
+- **Tela do mês**: a linha mostra `5/12` ao lado da descrição, do mesmo jeito
+  discreto que a tela de fixas já mostra "todo dia 8".
+- **Tela de contas fixas**: mostra "parcela 5 de 12" e, quando passou da
+  última, "acabou" — aí é só apagar.
+- **`faltandoNoMes()` no `app.js`**: o contador de "Trazer N contas fixas"
+  precisa da mesma janela, senão fica oferecendo para sempre uma conta que
+  acabou.
+
+**Custo aceito, e escrito antes:** a regra da janela passa a existir em dois
+lugares — no SQL do `gerar_mes()` e no JavaScript do `faltandoNoMes()`. É
+aritmética de três linhas dos dois lados, e a bancada mede o lado JavaScript.
+A alternativa (o `gerar_mes()` desligar a conta sozinha ao gerar a última) foi
+descartada porque cria um segundo mecanismo: `ativo` quer dizer "eu quero", e a
+janela quer dizer "ainda existe". Misturar os dois confunde na hora de entender
+por que uma conta sumiu.
+
+### O trabalho de verdade está na tela, não no banco
+
+Hoje, na tela de contas fixas, **não existe como editar uma conta fixa**: toque
+liga e desliga, toque no valor edita o valor, segurar apaga. Não há onde pôr
+"12 parcelas a partir de março". É preciso inventar um gesto — o candidato é
+tocar na linha "todo dia 8", que hoje não faz nada, e abrir uma folha com dia,
+parcelas e mês da primeira. Isso precisa respeitar a regra do projeto: polegar
+de uma mão só, sem burocracia.
+
+### As cinco contas que já existem
+
+Depois que a tela existir, Jonathan abre cada uma e preenche. Se preferir,
+um `update` no SQL Editor resolve em um minuto — ele sabe quais são; **elas não
+estão no repositório e não vão estar.**
+
+### O que a bancada vai medir
+
+A janela é função pura: parcela 1 no mês da primeira, 12 no décimo segundo,
+nada no décimo terceiro, nada antes da primeira. Mais o controle negativo de
+sempre: conta sem `parcelas_total` continua vindo todo mês, para sempre.
+
 ## VALIDAÇÕES MANUAIS PENDENTES
 
 Nenhuma delas pode ser feita por código; todas precisam de aparelho, de gente
@@ -520,11 +661,14 @@ ou do painel do Supabase.
 
 ## PRÓXIMA AÇÃO EXATA
 
-1. **Bloco 6**, o agendador. É a fundação dos outros dois.
-2. Em paralelo, duas coisas humanas: **a esposa entra no app** e liga os avisos
+1. **Mesclar o bloco 6 e rodar `sql/07_avisos.sql`** — as duas coisas juntas,
+   nessa ordem não importa, mas nenhuma sozinha.
+2. No dia seguinte, conferir no Actions **a que horas os runs realmente
+   dispararam** e se o aviso chegou perto do meio-dia. É a medição que decide
+   se o GitHub serve ou se a conversa do `pg_cron` volta.
+3. Em paralelo, duas coisas humanas: **a esposa entra no app** e liga os avisos
    no iPhone dela (sem isso o bloco 7 não tem para onde mandar), e **o teste do
    Realtime com dois aparelhos**, que é a última coisa da fase 1 sem prova.
-3. Rodar `sql/04_prova_rls.sql` para conferir que a RLS continua de pé depois
+4. Rodar `sql/04_prova_rls.sql` para conferir que a RLS continua de pé depois
    da migração de 05/09.
-4. Bloco 7, depois bloco 8. Nada dos três foi começado nem preparado de
-   véspera.
+5. Depois: bloco 7, bloco 9, bloco 8.
