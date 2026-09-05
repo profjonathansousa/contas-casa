@@ -90,6 +90,15 @@ medir('18h: o do almoco ja expirou', slotsAbertos(18), []);
 medir('meia-noite: nada abre',       slotsAbertos(0), []);
 medir('3h da manha: nada abre',      slotsAbertos(3), []);
 
+print('\n== slot pedido a mao tem que existir ==');
+medir('vespera', slotConhecido('vespera_20h'), true);
+medir('meio-dia', slotConhecido('dia_12h'),    true);
+medir('noite',    slotConhecido('dia_20h'),    true);
+print('  -- CONTROLE NEGATIVO --');
+print('  (nome errado nao pode virar notificacao com tag inventada)');
+medir('auto nao e slot',   slotConhecido('auto'),    false);
+medir('dia_21h nao existe', slotConhecido('dia_21h'), false);
+
 print('\n== o aviso da vespera pede uma acao ==');
 var v = montarVespera({ dia: '2026-09-09', vencem_amanha: 2, valor_amanha: 320.50,
   titulos_amanha: ['Aluguel', 'Escola'] });

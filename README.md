@@ -68,6 +68,10 @@ na linha **apaga a conta**, e esse pede confirmação, porque apagar não se
 desfaz. O `+` adiciona uma conta avulsa ao mês que está na tela. Tocar no nome
 do mês volta para o mês corrente.
 
+No rodapé, **"Avisar neste aparelho"** liga as notificações, e os três
+interruptores logo abaixo dizem quais avisos você quer receber. Toque liga e
+desliga cada um.
+
 ## Testes
 
 ```
@@ -155,9 +159,24 @@ rodando doze vezes.
 Continuam por fazer o bot do Telegram, como redundância, e o offline com
 IndexedDB.
 
-O aviso é **um por dia, e só quando há o que dizer**: dia sem conta vencendo e
-sem atraso não gera notificação nenhuma. Notificação que chega todo dia sem
-motivo é notificação que a pessoa aprende a ignorar.
+São **até três avisos por dia, e só quando há o que dizer**:
+
+| quando | o que diz |
+|---|---|
+| véspera, 20h | "2 contas vencem amanhã — deixe o pagamento pronto" |
+| no dia, meio-dia | "3 contas vencem hoje — R$ …" |
+| no dia, 20h | o que sobrou por pagar, mais as atrasadas |
+
+Dia sem conta vencendo e sem atraso não gera notificação nenhuma, e conta já
+paga não pinga de novo. Notificação que chega todo dia sem motivo é notificação
+que a pessoa aprende a ignorar — e é justamente por isso que **cada pessoa
+escolhe quais dos três quer**, nos três interruptores embaixo do botão de
+avisos. A escolha é da pessoa, não do aparelho: desligar num aparelho desliga
+em todos os dela.
+
+Os três avisos e a escolha por pessoa são do bloco 7, e **ainda não foram
+vistos chegar num aparelho** — o que já foi validado em produção é o aviso
+único.
 
 **Fase 0 — auditoria e estabilização, feita depois das outras duas.** Bancada
 que sabe ficar vermelha e roda no CI, `npm ci` com lockfile, quatro furos de

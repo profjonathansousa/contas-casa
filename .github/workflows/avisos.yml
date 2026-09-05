@@ -27,8 +27,12 @@ on:
         description: 'Forçar um aviso, ignorando a hora'
         required: false
         type: choice
-        options: ['', 'dia_12h', 'dia_20h']
-        default: ''
+        # 'auto' em vez de string vazia: opção vazia num choice é canto escuro
+        # do GitHub, e este arquivo ainda não foi exercitado por dispatch
+        # nenhum. E os TRÊS slots têm que estar aqui — o da véspera é
+        # justamente o que não dá para conferir esperando, porque só abre 20h.
+        options: ['auto', 'vespera_20h', 'dia_12h', 'dia_20h']
+        default: 'auto'
       seco:
         description: 'Só mostrar o que enviaria, sem enviar nem registrar'
         type: boolean

@@ -57,7 +57,7 @@ A terceira coluna é a que quase sempre falta.
 | **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **sim — chegou no iPhone; último envio 03/09/2026** |
 | **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
 | **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
-| **três avisos, um por pessoa** | sim (bloco 7) | sim (91/4/23/40) | **não — espera `sql/08` e merge** |
+| **três avisos, um por pessoa** | sim (bloco 7) | sim (91/4/23/45) | **não — nenhum chegou a aparelho ainda** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -636,7 +636,33 @@ Prometer antes disso seria pedir uma coisa que o app não sabe fazer.
   linha própria e o `rodar.sh` **confere que a troca aconteceu** e para se não
   aconteceu.
 
-Bancada: **91 / 4 / 23 / 40**, 0 falhas. As medidas novas cobrem o texto da
+### Correções da auditoria de véspera (05/09)
+
+Auditoria pedida antes de mesclar, contra o remoto. Três achados:
+
+1. **O disparo manual não oferecia o `vespera_20h`** — `options: ['', 'dia_12h',
+   'dia_20h']`. Justamente o aviso novo era o único que não dava para conferir
+   à mão, porque só abre às 20h. Os três estão lá agora, e a opção vazia virou
+   `'auto'`: opção de string vazia num `type: choice` é canto escuro do GitHub,
+   e este arquivo ainda não tinha sido exercitado por dispatch nenhum.
+2. **Slot desconhecido passava direto** e viraria notificação com tag
+   inventada. Agora o robô recusa e sai com erro. Medido, com controle
+   negativo.
+3. **O README se contradizia sozinho**: dizia "o aviso é um por dia" doze
+   linhas depois de descrever "um aviso por casa, por dia **e por slot**". E
+   não mencionava nem os três avisos, nem a escolha por pessoa, nem os três
+   interruptores. Corrigido.
+
+Um quarto ponto virou regra de operação, não conserto: **`sql/08` tem que ser
+aplicado ANTES do merge, nunca depois.** O `app.js` seleciona as três colunas
+novas do perfil; sem elas o PostgREST devolve erro, o `carregarPerfis` lança, o
+`abrirApp` faz `signOut()` e os dois moradores caem na tela de login com a
+mensagem crua do Postgres. Como o Pages publica no instante do merge, a ordem
+invertida derruba o app. A ordem certa é segura dos dois lados: aplicar o SQL
+com a `main` de então não quebra nada, porque o `montarAviso` do bloco 6 lê só
+os campos que conhece.
+
+Bancada: **91 / 4 / 23 / 45**, 0 falhas. As medidas novas cobrem o texto da
 véspera (plural, singular, lista longa), a coluna que cada slot consulta, o
 texto certo para cada slot, e os três interruptores na tela — inclusive o
 controle de que mexer em preferência de aviso não encosta em lançamento

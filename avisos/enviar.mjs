@@ -12,7 +12,8 @@
      VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
    Opcionais:
      DIA=2026-09-10   força a data (para testar)
-     SLOT=dia_12h     força o slot, ignorando a hora (para testar)
+     SLOT=dia_12h     força o slot, ignorando a hora (para testar).
+                      'auto' ou vazio = decide pela hora, que é o normal.
      SECO=1           calcula e mostra, mas não envia nem registra
 */
 import webpush from 'web-push';
@@ -20,7 +21,9 @@ import webpush from 'web-push';
 const URL_BASE = process.env.SUPABASE_URL;
 const CHAVE    = process.env.SUPABASE_SERVICE_ROLE;
 const DIA      = process.env.DIA || null;
-const SLOT     = process.env.SLOT || null;
+// 'auto' é o padrão do disparo manual e quer dizer "decida pela hora".
+const SLOT_PEDIDO = process.env.SLOT || '';
+const SLOT     = (SLOT_PEDIDO && SLOT_PEDIDO !== 'auto') ? SLOT_PEDIDO : null;
 const SECO     = process.env.SECO === '1';
 
 if (!URL_BASE || !CHAVE) { console.error('Faltam SUPABASE_URL / SUPABASE_SERVICE_ROLE.'); process.exit(1); }
@@ -135,6 +138,12 @@ const SLOTS = {
   dia_20h:     { abre: 20, expira: 24 }
 };
 
+// Slot pedido à mão que não existe não pode virar notificação torta: sem isto,
+// um nome errado passaria direto e mandaria um aviso com tag inventada.
+function slotConhecido(slot) {
+  return Object.prototype.hasOwnProperty.call(SLOTS, slot);
+}
+
 function slotsAbertos(hora) {
   return Object.keys(SLOTS).filter(function (s) {
     return hora >= SLOTS[s].abre && hora < SLOTS[s].expira;
@@ -162,6 +171,11 @@ function tagDoSlot(tagBase, slot) {
 }
 
 // ==== fim das funções puras ====
+
+if (SLOT && !slotConhecido(SLOT)) {
+  console.error(`SLOT desconhecido: "${SLOT}". Conhecidos: ${Object.keys(SLOTS).join(', ')}, auto.`);
+  process.exit(1);
+}
 
 const agora = emSaoPaulo(new Date());
 const dia = DIA || agora.dia;
