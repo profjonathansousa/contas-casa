@@ -91,13 +91,48 @@ function montarAviso(r) {
   return { titulo, corpo: partes.join(' · '), tag: 'resumo-' + r.dia };
 }
 
+// O aviso da véspera é outro recado: não informa, pede uma ação. Quem paga
+// prepara o pagamento na noite anterior, com calma, em vez de descobrir a
+// conta no dia. Só sai para quem tem o que preparar.
+function montarVespera(r) {
+  const n = r.vencem_amanha || 0;
+  if (n === 0) return null;
+
+  const nomes = (r.titulos_amanha || []).slice(0, 4).join(', ');
+  const resto = (r.titulos_amanha || []).length - 4;
+  return {
+    titulo: n === 1 ? '1 conta vence amanhã' : `${n} contas vencem amanhã`,
+    corpo: nomes + (resto > 0 ? ` e mais ${resto}` : '')
+         + ' — ' + dinheiro(r.valor_amanha) + ' · deixe o pagamento pronto',
+    tag: 'vespera-' + r.dia
+  };
+}
+
+// Qual coluna do perfil manda em cada aviso. Via função, e não pela tabela
+// solta, porque é assim que a bancada consegue medir: const dentro do recorte
+// não escapa dele.
+function colunaDoSlot(slot) {
+  return {
+    vespera_20h: 'avisa_vespera_20h',
+    dia_12h: 'avisa_dia_12h',
+    dia_20h: 'avisa_dia_20h'
+  }[slot];
+}
+
+function montarDoSlot(r, slot) {
+  return slot === 'vespera_20h' ? montarVespera(r) : montarAviso(r);
+}
+
 // Cada aviso abre numa hora e deixa de fazer sentido em outra. "Vence hoje"
 // mandado à meia-noite chegou tarde demais para servir de aviso e cedo demais
 // para ser educado; melhor não mandar. É isso que "expira" quer dizer aqui.
 // Horas de Brasília, e o intervalo é aberto no fim: abre <= hora < expira.
 const SLOTS = {
-  dia_12h: { abre: 12, expira: 18 },
-  dia_20h: { abre: 20, expira: 24 }
+  dia_12h:     { abre: 12, expira: 18 },
+  // Os dois das 20h são o mesmo relógio de propósito: uma execução manda os
+  // dois recados, "vence amanhã" e "ainda hoje, não pago".
+  vespera_20h: { abre: 20, expira: 24 },
+  dia_20h:     { abre: 20, expira: 24 }
 };
 
 function slotsAbertos(hora) {
@@ -144,26 +179,37 @@ const resumos = await api('/rpc/resumo_do_dia', {
   method: 'POST',
   body: JSON.stringify(DIA ? { p_dia: DIA } : {})
 });
-const inscricoes = await api('/push_inscricao?select=id,casa_id,endpoint,p256dh,auth');
+const perfis = await api('/perfil?select=id,casa_id,nome,avisa_vespera_20h,avisa_dia_12h,avisa_dia_20h');
+const inscricoes = await api('/push_inscricao?select=id,casa_id,perfil_id,endpoint,p256dh,auth');
 
-console.log(`casas com conta em aberto: ${resumos.length} | aparelhos inscritos: ${inscricoes.length}`);
+console.log(`casas com conta em aberto: ${resumos.length} | pessoas: ${perfis.length} | `
+          + `aparelhos inscritos: ${inscricoes.length}`);
 
-let enviados = 0, limpos = 0, falhos = 0, semAviso = 0, repetidos = 0;
+let enviados = 0, limpos = 0, falhos = 0, semAviso = 0, repetidos = 0, naoQuer = 0, semAparelho = 0;
 
 for (const slot of slots) {
-  const registro = await api(`/aviso_enviado?dia=eq.${dia}&slot=eq.${slot}&select=casa_id`);
-  const jaFoi = new Set((registro || []).map((x) => x.casa_id));
+  const registro = await api(`/aviso_enviado?dia=eq.${dia}&slot=eq.${slot}&select=casa_id,perfil_id`);
+  const jaFoiPessoa = new Set((registro || []).filter((x) => x.perfil_id).map((x) => x.perfil_id));
+  // Registro sem pessoa é de antes do bloco 7, quando o aviso era da casa
+  // inteira. Vale por todo mundo dela: senão, no dia da virada, quem já tinha
+  // recebido receberia de novo.
+  const jaFoiCasa = new Set((registro || []).filter((x) => !x.perfil_id).map((x) => x.casa_id));
 
-  for (const r of resumos) {
-    if (jaFoi.has(r.casa_id)) { repetidos++; continue; }
+  for (const p of perfis) {
+    if (p[colunaDoSlot(slot)] === false) { naoQuer++; continue; }
+    if (jaFoiPessoa.has(p.id) || jaFoiCasa.has(p.casa_id)) { repetidos++; continue; }
 
-    const aviso = montarAviso(r);
+    const r = resumos.find((x) => x.casa_id === p.casa_id);
+    if (!r) { semAviso++; continue; }
+
+    const aviso = montarDoSlot(r, slot);
     if (!aviso) { semAviso++; continue; }
     aviso.tag = tagDoSlot(aviso.tag, slot);
 
-    const alvos = inscricoes.filter((i) => i.casa_id === r.casa_id);
-    console.log(`[${slot}] casa ${r.casa_id.slice(0, 8)} | ${alvos.length} aparelho(s) | ${aviso.titulo} — ${aviso.corpo}`);
+    const alvos = inscricoes.filter((i) => i.perfil_id === p.id);
+    console.log(`[${slot}] ${p.nome} | ${alvos.length} aparelho(s) | ${aviso.titulo} — ${aviso.corpo}`);
     if (SECO) continue;
+    if (alvos.length === 0) { semAparelho++; continue; }
 
     let algumChegou = false;
     for (const i of alvos) {
@@ -200,7 +246,7 @@ for (const slot of slots) {
         await api('/aviso_enviado', {
           method: 'POST',
           headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({ casa_id: r.casa_id, dia, slot })
+          body: JSON.stringify({ casa_id: p.casa_id, perfil_id: p.id, dia, slot })
         });
       } catch (e) {
         // 409 = outro run registrou primeiro. Não é erro.
@@ -211,5 +257,6 @@ for (const slot of slots) {
 }
 
 console.log(`enviados: ${enviados} | inscrições mortas removidas: ${limpos} | falhas: ${falhos} | `
-          + `casas sem nada a avisar: ${semAviso} | já avisadas nesta hora: ${repetidos}`);
+          + `sem nada a avisar: ${semAviso} | já avisados: ${repetidos} | `
+          + `não quiseram este aviso: ${naoQuer} | sem aparelho inscrito: ${semAparelho}`);
 if (falhos > 0) process.exitCode = 1;

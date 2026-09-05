@@ -81,14 +81,53 @@ print('\n== qual aviso esta aberto ==');
 medir('11h: cedo demais',      slotsAbertos(11), []);
 medir('12h: abre o do almoco', slotsAbertos(12), ['dia_12h']);
 medir('17h: ainda vale',       slotsAbertos(17), ['dia_12h']);
-medir('20h: abre o da noite',  slotsAbertos(20), ['dia_20h']);
-medir('23h: ainda vale',       slotsAbertos(23), ['dia_20h']);
+medir('20h: abrem os dois da noite', slotsAbertos(20), ['vespera_20h', 'dia_20h']);
+medir('23h: ainda valem',            slotsAbertos(23), ['vespera_20h', 'dia_20h']);
 
 print('\n  -- CONTROLE NEGATIVO --');
 print('  (aviso atrasado tem hora para deixar de fazer sentido; senao chega de madrugada)');
 medir('18h: o do almoco ja expirou', slotsAbertos(18), []);
 medir('meia-noite: nada abre',       slotsAbertos(0), []);
 medir('3h da manha: nada abre',      slotsAbertos(3), []);
+
+print('\n== o aviso da vespera pede uma acao ==');
+var v = montarVespera({ dia: '2026-09-09', vencem_amanha: 2, valor_amanha: 320.50,
+  titulos_amanha: ['Aluguel', 'Escola'] });
+medir('titulo', v.titulo, '2 contas vencem amanha'.replace('amanha', 'amanhã'));
+medir('corpo',  v.corpo, 'Aluguel, Escola — R$ 320,50 · deixe o pagamento pronto');
+medir('tag propria, nao a do resumo', v.tag, 'vespera-2026-09-09');
+
+print('\n  -- uma so: singular --');
+var v1 = montarVespera({ dia: '2026-09-09', vencem_amanha: 1, valor_amanha: 80,
+  titulos_amanha: ['Luz'] });
+medir('titulo', v1.titulo, '1 conta vence amanhã');
+
+print('\n  -- lista longa nao estoura --');
+var v4 = montarVespera({ dia: '2026-09-09', vencem_amanha: 6, valor_amanha: 999.99,
+  titulos_amanha: ['Água','Escola','Internet','Luz','Mercado','Telefone'] });
+medir('corta em 4', v4.corpo,
+      'Água, Escola, Internet, Luz e mais 2 — R$ 999,99 · deixe o pagamento pronto');
+
+print('\n  -- CONTROLE NEGATIVO --');
+print('  (nada vencendo amanha NAO pode virar aviso de vespera)');
+medir('vespera vazia', montarVespera({ dia: '2026-09-09', vencem_amanha: 0,
+  valor_amanha: 0, titulos_amanha: null }), null);
+print('  (e conta atrasada nao entra na vespera: ela e assunto dos avisos do dia)');
+medir('atrasada nao vira vespera', montarVespera({ dia: '2026-09-09', vencem_amanha: 0,
+  valor_amanha: 0, atrasadas: 5, valor_atrasado: 900, titulos_amanha: null }), null);
+
+print('\n== cada slot puxa a coluna certa do perfil ==');
+medir('vespera',  colunaDoSlot('vespera_20h'), 'avisa_vespera_20h');
+medir('meio-dia', colunaDoSlot('dia_12h'),     'avisa_dia_12h');
+medir('noite',    colunaDoSlot('dia_20h'),     'avisa_dia_20h');
+
+print('\n== e monta o texto certo para cada slot ==');
+var rTudo = { dia: '2026-09-09', vencem_hoje: 1, valor_hoje: 50, atrasadas: 0,
+  valor_atrasado: 0, sem_valor: 0, titulos: ['Agua'],
+  vencem_amanha: 1, valor_amanha: 80, titulos_amanha: ['Luz'] };
+medir('vespera fala do amanha',  montarDoSlot(rTudo, 'vespera_20h').titulo, '1 conta vence amanhã');
+medir('meio-dia fala do hoje',   montarDoSlot(rTudo, 'dia_12h').titulo,     '1 conta vence hoje');
+medir('noite tambem fala do hoje', montarDoSlot(rTudo, 'dia_20h').titulo,   '1 conta vence hoje');
 
 print('\n== a tag separa os dois avisos do mesmo dia ==');
 print('  (mesma tag faria o da noite apagar o do almoco na tela do celular)');

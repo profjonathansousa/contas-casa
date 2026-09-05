@@ -16,7 +16,7 @@ O `node` não sabe esvaziar a fila de microtarefas no meio de uma medição, que
 e o `readFile`), e por isso o `rodar.sh` chama o node com
 `--allow-natives-syntax`. A ponte não finge nada do app.
 
-Cada bloco termina em número. O placar tem que fechar em **81 / 4 / 23 / 27**
+Cada bloco termina em número. O placar tem que fechar em **91 / 4 / 23 / 40**
 medidas e **0 falhas**. O `rodar.sh` confere isso sozinho e sai com código
 diferente de zero se qualquer medida falhar, se o motor morrer ou se o placar
 mudar — antes ele saía zero mesmo com a bancada vermelha, e um CI assim seria
@@ -33,6 +33,12 @@ Há controles negativos de propósito: um evento de tempo real de outro mês tem
 que ser ignorado; um service worker sem cache e sem rede tem que devolver nada
 em vez de inventar resposta; uma sessão sem perfil tem que voltar para o login.
 Se essas medidas passarem a "dar certo" sozinhas, a bancada quebrou.
+
+O controle do "sem perfil" é montado trocando **uma linha** do `prelude.js`
+(`var ID_DO_PERFIL_1 = ID_EU;`) por um id que não existe. O `rodar.sh` confere
+que a troca aconteceu e para se não aconteceu: um controle negativo que deixa
+de ser aplicado passa a medir a mesma coisa da rodada normal e "dá certo" pelo
+motivo errado, que é o pior defeito que uma bancada pode ter.
 
 Quem roda isso sozinho: `.github/workflows/testes.yml`, a cada push e a cada
 pull request. É um workflow separado do Web Push de propósito — a bancada não

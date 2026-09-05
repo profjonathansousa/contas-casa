@@ -8,7 +8,7 @@
 # quebrada, que é pior do que não ter CI.
 set -e
 
-ESPERADO='81 / 4 / 23 / 27'
+ESPERADO='91 / 4 / 23 / 40'
 
 AQUI=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP=$(CDPATH= cd -- "$AQUI/.." && pwd)
@@ -66,9 +66,16 @@ rodar() {                              # rodar <título> <arquivo>
 cat "$PONTE" "$T/dir.js" "$AQUI/prelude.js" "$APP/app.js" "$AQUI/testes.js" > "$T/a.js"
 rodar 'app.js' "$T/a.js"
 
-# controle negativo: sessão válida sem perfil na casa tem que voltar ao login
-sed "s|return { data: \[ { id: ID_EU, casa_id: CASA, nome: 'Jonathan' },|return { data: [ { id: 'nao-e-voce', casa_id: CASA, nome: 'Jonathan' },|" \
+# controle negativo: sessão válida sem perfil na casa tem que voltar ao login.
+# O sed abaixo é o controle inteiro: se ele parar de casar, o bloco passa a
+# medir a mesma coisa da rodada normal e "dá certo" pelo motivo errado. Por
+# isso a troca é conferida logo em seguida.
+sed "s|^var ID_DO_PERFIL_1 = ID_EU;|var ID_DO_PERFIL_1 = 'nao-e-voce';|" \
   "$AQUI/prelude.js" > "$T/p2.js"
+if ! grep -q "^var ID_DO_PERFIL_1 = 'nao-e-voce';" "$T/p2.js"; then
+  echo "!! o controle negativo do 'sem perfil' não foi aplicado: o sed não casou"
+  exit 1
+fi
 cat "$PONTE" "$T/dir.js" "$T/p2.js" "$APP/app.js" "$AQUI/teste_semperfil.js" > "$T/b.js"
 rodar 'sem perfil' "$T/b.js"
 

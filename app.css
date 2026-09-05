@@ -115,6 +115,16 @@ button { border: 0; background: none; cursor: pointer; }
 }
 .avisos.ligado { background: var(--pago-fundo); border-color: transparent; color: var(--pago); }
 .avisos.bloqueado { color: var(--fraco); font-weight: 400; }
+
+/* quais avisos esta pessoa quer. Cada um é da PESSOA, não do aparelho: quem
+   desliga aqui desliga no iPhone e no iPad. */
+.pref-avisos { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: -8px 0 14px; }
+.pref {
+  background: none; border: 0; padding: 6px 10px;
+  font-size: 14px; color: var(--fraco);
+}
+.pref.ligado { color: var(--pago); font-weight: 600; }
+.pref:active { opacity: .6; }
 .gerar {
   display: block; margin: 12px 10px 2px; width: calc(100% - 20px); padding: 16px 14px;
   background: var(--verde); color: #fff; border-radius: var(--raio);

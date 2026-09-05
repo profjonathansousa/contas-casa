@@ -31,7 +31,8 @@ CONTAS_CASA/
 │   ├── 04_prova_rls.sql       prova a RLS fingindo ser um usuário autenticado
 │   ├── 05_modelos.sql         contas fixas + gerar_mes() + fixar_mes()
 │   ├── 06_push.sql            inscrições de aviso + resumo_do_dia()
-│   └── 07_avisos.sql          memória de aviso enviado (um por dia e por slot)
+│   ├── 07_avisos.sql          memória de aviso enviado (um por dia e por slot)
+│   └── 08_avisos_por_pessoa.sql  preferência de aviso por pessoa + véspera
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -75,7 +76,7 @@ do mês volta para o mês corrente.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
 onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 81 / 4 / 23 / 27 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 91 / 4 / 23 / 40 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 

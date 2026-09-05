@@ -79,6 +79,20 @@ function lanc(id, desc, dia, valor, pago) {
            pago_em: pago ? '2026-08-31T14:32:00.000Z' : null,
            pago_por: pago ? ID_OUTRO : null };
 }
+// O rodar.sh troca ESTA linha para montar o controle negativo do "sem perfil".
+// Ficar numa linha própria e curta é de proposito: antes o sed tinha que casar
+// com um objeto inteiro, e qualquer virgula a mais fazia o controle passar a
+// medir a mesma coisa da rodada normal, sem ninguem perceber.
+var ID_DO_PERFIL_1 = ID_EU;
+
+// Preferencia de aviso (bloco 7): o Jonathan quer os tres, a Marina so as 20h.
+var PERFIS = [
+  { id: ID_DO_PERFIL_1, casa_id: CASA, nome: 'Jonathan',
+    avisa_vespera_20h: true,  avisa_dia_12h: true,  avisa_dia_20h: true },
+  { id: ID_OUTRO, casa_id: CASA, nome: 'Marina',
+    avisa_vespera_20h: false, avisa_dia_12h: false, avisa_dia_20h: true }
+];
+
 function mod(id, desc, dia, valor, ativo) {
   return { id: id, descricao: desc, dia_vencimento: dia, valor_padrao: valor, ativo: !!ativo };
 }
@@ -135,8 +149,9 @@ var supabase = {
           select: function (cols) {
             var t = thenable(function () {
               if (tabela === 'perfil') {
-                return { data: [ { id: ID_EU, casa_id: CASA, nome: 'Jonathan' },
-                                 { id: ID_OUTRO, casa_id: CASA, nome: 'Marina' } ], error: null };
+                return { data: PERFIS.map(function (x) {
+                  var c = {}; for (var k in x) c[k] = x[k]; return c;
+                }), error: null };
               }
               if (tabela === 'modelo') {
                 LOG.selects.push({ tabela: 'modelo' });

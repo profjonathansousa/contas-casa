@@ -23,7 +23,9 @@ var el = {
   apDesc: $('#ap-desc'), apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar'),
   adTitulo: $('#ad-titulo'), btnGerar: $('#btn-gerar'), btnFixas: $('#btn-fixas'),
   fixas: $('#tela-fixas'), fxLista: $('#fx-lista'), fxVoltar: $('#fx-voltar'),
-  fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes'), btnAvisos: $('#btn-avisos')
+  fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes'), btnAvisos: $('#btn-avisos'),
+  prefAvisos: $('#pref-avisos'), prefVespera: $('#pref-vespera'),
+  pref12: $('#pref-12h'), pref20: $('#pref-20h')
 };
 
 var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
@@ -41,6 +43,16 @@ var tipoApagar = 'lancamento';
 var modoFolha = 'lancamento';   // a folha de "+" serve às duas telas
 var modelos = [];               // contas fixas
 var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo';
+var COLUNAS_PERFIL = 'id, casa_id, nome, avisa_vespera_20h, avisa_dia_12h, avisa_dia_20h';
+
+// Os três avisos do dia, e a coluna do perfil que manda em cada um. A
+// preferência é da PESSOA, não do aparelho: desligar aqui desliga em todos os
+// aparelhos dela, que é o que se espera de "não quero ser avisado assim".
+var AVISOS = [
+  { onde: 'prefVespera', campo: 'avisa_vespera_20h', rotulo: 'na véspera, 20h' },
+  { onde: 'pref12',      campo: 'avisa_dia_12h',     rotulo: 'no dia, meio-dia' },
+  { onde: 'pref20',      campo: 'avisa_dia_20h',     rotulo: 'no dia, 20h' }
+];
 
 /* ---------- datas e dinheiro ---------- */
 
@@ -139,7 +151,7 @@ el.btnSair.addEventListener('click', async function () {
 /* ---------- carregar ---------- */
 
 async function carregarPerfis() {
-  var r = await db.from('perfil').select('id, casa_id, nome');
+  var r = await db.from('perfil').select(COLUNAS_PERFIL);
   if (r.error) throw r.error;
   nomes = {};
   r.data.forEach(function (p) { nomes[p.id] = p.nome; });
@@ -601,6 +613,8 @@ async function inscricaoAtual() {
 }
 
 async function pintarBotaoAvisos() {
+  pintarPreferencias();
+  el.prefAvisos.hidden = !temPush();
   if (!temPush()) { el.btnAvisos.hidden = true; return; }
   el.btnAvisos.hidden = false;
   el.btnAvisos.className = 'avisos';
@@ -617,6 +631,36 @@ async function pintarBotaoAvisos() {
     el.btnAvisos.textContent = 'Avisar neste aparelho';
   }
 }
+
+// Coluna ausente conta como ligada: no banco elas são NOT NULL com padrão
+// true, então isto só acontece antes de alguém rodar o sql/08.
+function querAviso(a) { return !eu || eu[a.campo] !== false; }
+
+function pintarPreferencias() {
+  AVISOS.forEach(function (a) {
+    var b = el[a.onde];
+    var ligado = querAviso(a);
+    b.className = 'pref' + (ligado ? ' ligado' : '');
+    b.textContent = (ligado ? '✓ ' : '○ ') + a.rotulo;
+  });
+}
+
+AVISOS.forEach(function (a) {
+  el[a.onde].addEventListener('click', async function () {
+    if (!eu) return;
+    var antes = querAviso(a);
+    eu[a.campo] = !antes;
+    pintarPreferencias();                       // resposta imediata, como o resto do app
+    var campos = {};
+    campos[a.campo] = eu[a.campo];
+    var r = await db.from('perfil').update(campos).eq('id', eu.id);
+    if (r.error) {
+      eu[a.campo] = antes;
+      pintarPreferencias();
+      aviso('Não deu para salvar. ' + r.error.message);
+    }
+  });
+});
 
 el.btnAvisos.addEventListener('click', async function () {
   if (Notification.permission === 'denied') {

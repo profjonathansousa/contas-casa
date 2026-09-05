@@ -272,5 +272,40 @@ esperar();
 medir('botao sumiu quando nao falta nada', q('#btn-gerar').hidden, true);
 guardaM.forEach(function (x) { MODELOS.push(x); });
 
+print('\n== 14. quais avisos eu quero ==');
+print('  (a preferencia e da PESSOA: desligar aqui desliga em todos os aparelhos dela)');
+function rotulos() {
+  return ['#pref-vespera', '#pref-12h', '#pref-20h'].map(function (s) { return q(s)._txt; });
+}
+medir('os tres nascem ligados', rotulos(),
+      ['\u2713 na véspera, 20h', '\u2713 no dia, meio-dia', '\u2713 no dia, 20h']);
+
+print('\n  -- desligar o do meio-dia --');
+var lancAntes = LOG.updates.filter(function (u) { return u.tabela === 'lancamento'; }).length;
+var upP = LOG.updates.length;
+q('#pref-12h').disparar('click');
+medir('apagou na hora (otimista)', q('#pref-12h')._txt, '\u25cb no dia, meio-dia');
+esperar();
+medir('tabela',          LOG.updates[upP].tabela, 'perfil');
+medir('campos no update', LOG.updates[upP].campos, ['avisa_dia_12h']);
+medir('valor enviado',   LOG.updates[upP].valores.avisa_dia_12h, false);
+medir('id enviado',      LOG.updates[upP].id, ID_EU);
+
+print('\n  -- tocar de novo religa --');
+var upP2 = LOG.updates.length;
+q('#pref-12h').disparar('click');
+esperar();
+medir('valor enviado',   LOG.updates[upP2].valores.avisa_dia_12h, true);
+medir('acendeu de volta', q('#pref-12h')._txt, '\u2713 no dia, meio-dia');
+
+print('\n  -- CONTROLE NEGATIVO --');
+print('  (mexer em preferencia de aviso nao pode encostar em lancamento nenhum)');
+medir('nenhum lancamento tocado',
+      LOG.updates.filter(function (u) { return u.tabela === 'lancamento'; }).length, lancAntes);
+print('  (e nao pode mexer no que eu nao toquei)');
+medir('os outros dois seguem ligados',
+      [q('#pref-vespera')._txt, q('#pref-20h')._txt],
+      ['\u2713 na véspera, 20h', '\u2713 no dia, 20h']);
+
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

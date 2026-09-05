@@ -2,6 +2,38 @@
 
 Atualizado em 02/09/2026 — fim da fase 0: auditoria e estabilização. NO AR.
 
+## Duas contagens diferentes, e a confusão entre elas
+
+Este projeto usa duas palavras que parecem a mesma coisa e não são:
+
+- **Fase** é escopo de produto — o que o app faz. Estão no `README.md`: fase 1
+  (a tela do mês), fase 2 (o aviso), fase 3 (parcelas, gráficos, histórico).
+- **Bloco** é unidade de trabalho — uma sessão, uma entrega.
+
+A auditoria de 05/09 foi pedida como **"Fase 0"** e ficou com esse nome, mas é
+um bloco de trabalho, não uma fase do produto. Fica registrado para ninguém
+procurar uma "fase 0" no roadmap do README e não achar.
+
+E há um buraco: **os blocos 1, 2 e 3 nunca foram numerados.** Este arquivo só
+batiza "Bloco 4 — contas fixas" e "Bloco 5 — notificação push"; o que veio
+antes está descrito, mas sem número. Reconstruído do histórico do git, para a
+numeração parar de ter começo faltando:
+
+| bloco | quando | o que foi |
+|---|---|---|
+| **1 — banco e RLS** | 30/08 23:53 a 31/08 00:50 | as três tabelas, as constraints, os triggers de vencimento e de autoria, RLS ligada e forçada, e a prova de RLS com controle negativo (`sql/01` a `sql/04`) |
+| **2 — a interface da fase 1** | 31/08 01:09 a 08:28 | login, tela do mês, toque marca pago, tempo real, selo de autoria, editar valor, conta avulsa, navegar entre meses, PWA, apagar segurando o dedo, e o ajuste do toque longo de 0,5 para 0,7 s |
+| **3 — publicação** | 31/08 08:04 | GitHub Pages no ar, service worker registrando de verdade, e as medições no site publicado |
+| **4 — contas fixas** | 31/08 08:51 | descrito adiante, com esse nome |
+| **5 — notificação push** | 31/08 09:12 a 11:29 | descrito adiante, com esse nome |
+| **0 — auditoria** ("Fase 0") | 05/09 | descrito adiante |
+| **6 — pontualidade do agendador** | 05/09 | descrito adiante |
+| **7 — três avisos, por pessoa** | 05/09 | descrito adiante |
+
+Os blocos 2 e 3 se cruzam no histórico: a publicação foi registrada às 08:04 e
+o ajuste do toque longo às 08:28. A fronteira entre os dois não é limpa, e não
+adianta fingir que é.
+
 ## Em que grau cada coisa está de pé
 
 Três colunas diferentes, e a diferença importa: **implementado** é código
@@ -24,7 +56,8 @@ A terceira coluna é a que quase sempre falta.
 | **Web Push: inscrever o aparelho** | sim | não (não dá para medir fora do navegador) | sim: 1 inscrição no banco |
 | **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **sim — chegou no iPhone; último envio 03/09/2026** |
 | **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
-| **slots de aviso por hora de Brasília** | sim (bloco 6) | sim (27 medidas) | **não — espera merge e `sql/07`** |
+| **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
+| **três avisos, um por pessoa** | sim (bloco 7) | sim (91/4/23/40) | **não — espera `sql/08` e merge** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -540,18 +573,89 @@ devolvem como "24" e faria o slot da noite nunca fechar), a abertura e a
 expiração de cada slot, e a tag por slot. Três são controle negativo: 18h,
 meia-noite e 3h da manhã não podem abrir aviso nenhum.
 
-**Ainda não aplicado no banco, de propósito.** `sql/07_avisos.sql` cria uma
-tabela que só a versão nova do robô usa, e a versão nova só roda depois do
-merge. Criar agora deixaria no banco uma tabela órfã — exatamente o que a fase
-0 criticou em `cron_push_inscricao`. **Rodar o `07` faz parte do merge.** Se
-esquecer, o workflow fica vermelho na primeira execução, o que é visível.
+**Concluído em 05/09**, com autorização de Jonathan: `sql/07_avisos.sql`
+aplicado no banco (`aviso_enviado` de pé, RLS ligada e forçada, zero políticas,
+`anon` e `authenticated` sem leitura, zero linhas) e a branch mesclada na
+`main`. A primeira execução do cron novo é às 15:17 UTC — 12:17 de Brasília —
+e é ela que mede se o remédio funcionou.
+
+## Bloco 7 — três avisos, um por pessoa (05/09/2026)
+
+**Escrito e medido. Espera `sql/08` e merge.**
+
+Até aqui o robô montava **uma mensagem por casa** e mandava para todos os
+aparelhos dela. Quem paga a maioria das contas é a Marina, e ela quer só o
+aviso das 20h; o Jonathan quer os três. Então o laço passou a ser **por
+pessoa**.
+
+### Onde a preferência mora, e por quê
+
+Na **pessoa** (`perfil`), não no aparelho (`push_inscricao`). Um aparelho é
+endereço de entrega; querer ou não querer é da pessoa — quem desliga um aviso
+espera que ele desligue no iPhone e no iPad. E há uma economia real nisso: a
+política `perfil_editar_o_meu` já deixa cada um mexer na própria linha e só
+nela, com o `with check` impedindo mudar de casa. **Nenhuma política nova.**
+
+Três colunas booleanas, `default true`: quem não quiser, desliga uma vez.
+
+### Os três avisos
+
+| slot | hora (Brasília / UTC) | o que diz |
+|---|---|---|
+| `vespera_20h` | 20h / 23:00 | "2 contas vencem amanhã — R$ 320,50 · deixe o pagamento pronto" |
+| `dia_12h` | 12h / 15:00 | "3 contas vencem hoje — …" |
+| `dia_20h` | 20h / 23:00 | o mesmo do meio-dia, com o que sobrou por pagar |
+
+Os dois das 20h são **a mesma execução**, com tags diferentes, senão um apaga
+o outro na tela do celular.
+
+O texto da véspera **pede uma ação em vez de informar** — foi ideia de
+Jonathan, e é melhor do que o desenho anterior: quem paga prepara o pagamento
+na noite anterior, com calma. Por ora diz "deixe o pagamento pronto"; vira
+"cole o código de pagamento no app" no bloco 8, quando existir onde colar.
+Prometer antes disso seria pedir uma coisa que o app não sabe fazer.
+
+### Detalhes que valem estar escritos
+
+- **`resumo_do_dia` passou a enxergar o dia seguinte.** É `drop` e `create`,
+  não `create or replace`: mudar as colunas devolvidas muda o tipo de retorno,
+  e o Postgres não deixa substituir. O `drop` leva as permissões junto, então
+  os `grant` estão repetidos logo abaixo no arquivo.
+- **"Sem valor" continua sendo só do que já venceu.** A conta de amanhã ainda
+  tem o dia de hoje para ganhar valor; contá-la ali seria cobrar cedo.
+- **Registro antigo, sem pessoa, vale por todo mundo da casa.** No dia da
+  virada existem linhas de `aviso_enviado` gravadas pelo bloco 6, quando o
+  aviso era da casa inteira. Sem essa regra, quem já tinha recebido receberia
+  de novo.
+- **A tabela de slot virou função** (`colunaDoSlot`), porque `const` dentro do
+  recorte da bancada não escapa dele. A bancada só mede o que consegue chamar.
+- **O controle negativo do "sem perfil" ficou explícito.** Ele é montado
+  trocando uma linha do `prelude.js` por `sed`; antes o `sed` casava com um
+  objeto inteiro, e mexer no perfil falso quebraria a troca em silêncio — o
+  controle passaria a medir a mesma coisa da rodada normal. Agora o alvo é uma
+  linha própria e o `rodar.sh` **confere que a troca aconteceu** e para se não
+  aconteceu.
+
+Bancada: **91 / 4 / 23 / 40**, 0 falhas. As medidas novas cobrem o texto da
+véspera (plural, singular, lista longa), a coluna que cada slot consulta, o
+texto certo para cada slot, e os três interruptores na tela — inclusive o
+controle de que mexer em preferência de aviso não encosta em lançamento
+nenhum.
+
+### O que falta para o bloco 7 valer
+
+1. Rodar `sql/08_avisos_por_pessoa.sql` no banco.
+2. Mesclar.
+3. **A Marina entrar no app** e ligar os avisos no iPhone dela — sem isso não
+   há para onde mandar as 20h. Depois é ela quem desliga os dois que não quer,
+   na própria tela.
 
 ## Roadmap — blocos 6 a 9
 
 | bloco | o que é | estado | depende de |
 |---|---|---|---|
-| **6** | pontualidade do agendador | **feito**, espera merge + `sql/07` | — |
-| **7** | três avisos, um por pessoa | próximo | bloco 6 e o login da esposa |
+| **6** | pontualidade do agendador | **feito e no ar** | — |
+| **7** | três avisos, um por pessoa | **escrito e medido**, espera `sql/08` + merge | bloco 6 e o login da Marina |
 | **9** | parcelas | desenhado abaixo | nada |
 | **8** | código de barras / PIX colado | desenhado | nada |
 
@@ -661,14 +765,12 @@ ou do painel do Supabase.
 
 ## PRÓXIMA AÇÃO EXATA
 
-1. **Mesclar o bloco 6 e rodar `sql/07_avisos.sql`** — as duas coisas juntas,
-   nessa ordem não importa, mas nenhuma sozinha.
-2. No dia seguinte, conferir no Actions **a que horas os runs realmente
-   dispararam** e se o aviso chegou perto do meio-dia. É a medição que decide
-   se o GitHub serve ou se a conversa do `pg_cron` volta.
-3. Em paralelo, duas coisas humanas: **a esposa entra no app** e liga os avisos
-   no iPhone dela (sem isso o bloco 7 não tem para onde mandar), e **o teste do
-   Realtime com dois aparelhos**, que é a última coisa da fase 1 sem prova.
-4. Rodar `sql/04_prova_rls.sql` para conferir que a RLS continua de pé depois
-   da migração de 05/09.
-5. Depois: bloco 7, bloco 9, bloco 8.
+1. **Conferir no Actions a que horas os runs de hoje dispararam** e se o aviso
+   chegou perto do meio-dia. É a medição que decide se o GitHub serve ou se a
+   conversa do `pg_cron` volta. Primeira execução do cron novo: 15:17 UTC.
+2. **Rodar `sql/08_avisos_por_pessoa.sql` e mesclar o bloco 7.**
+3. **A Marina entra no app** e liga os avisos no iPhone dela. Sem isso o bloco
+   7 não tem para onde mandar as 20h.
+4. **Realtime com dois aparelhos** — a última coisa da fase 1 sem prova.
+5. Rodar `sql/04_prova_rls.sql` depois das migrações de 05/09.
+6. Depois: bloco 9 (parcelas), bloco 8 (código colado).
