@@ -592,9 +592,8 @@ pessoas com os três avisos ligados (é o padrão), e `resumo_do_dia` continua
 execução para `authenticated` e para o robô.
 
 Até aqui o robô montava **uma mensagem por casa** e mandava para todos os
-aparelhos dela. Quem paga a maioria das contas é a Marina, e ela quer só o
-aviso das 20h; o Jonathan quer os três. Então o laço passou a ser **por
-pessoa**.
+aparelhos dela. Quem paga a maioria das contas quer só o aviso das 20h; o
+Jonathan quer os três. Então o laço passou a ser **por pessoa**.
 
 ### Onde a preferência mora, e por quê
 
@@ -680,9 +679,9 @@ nenhum.
 
 Código e banco estão prontos; o que falta é gente e aparelho.
 
-1. **A Marina entrar no app** e ligar os avisos no iPhone dela — sem isso não
-   há para onde mandar as 20h. Depois é ela quem desliga os dois que não quer,
-   na própria tela.
+1. **A segunda pessoa da casa entrar no app** e ligar os avisos no iPhone
+   dela — sem isso não há para onde mandar as 20h. Depois é ela quem desliga
+   os dois que não quer, na própria tela.
 2. **Ver o aviso de véspera chegar.** Actions > "Aviso diário das contas" >
    Run workflow, escolhendo `vespera_20h` e marcando **seco** para conferir o
    texto sem mandar; depois sem o seco.
@@ -707,7 +706,7 @@ aberto.
 | bloco | o que é | estado | depende de |
 |---|---|---|---|
 | **6** | pontualidade do agendador | **feito e no ar** | — |
-| **7** | três avisos, um por pessoa | **escrito e medido**, espera `sql/08` + merge | bloco 6 e o login da Marina |
+| **7** | três avisos, um por pessoa | **escrito e medido**, espera `sql/08` + merge | bloco 6 e o login da segunda pessoa |
 | **9** | parcelas | desenhado abaixo | nada |
 | **8** | código de barras / PIX colado | desenhado | nada |
 
@@ -838,6 +837,24 @@ De quebra, a auditoria do placar pegou uma dívida da rodada anterior: o
 `rodar.sh` já exigia 45 no quarto bloco, mas o README e o `testes/LEIA.md`
 ainda diziam 40. O guarda do placar confere o `rodar.sh`, não os documentos.
 
+### Um nome fictício vazou para a documentação
+
+Achado em 05/09, ao conferir um nome: **"Marina" é o nome de mentira da
+bancada** (`testes/prelude.js`), e ele escorregou de lá para quatro pontos
+deste arquivo e para um comentário do `sql/08`, como se fosse a esposa do
+Jonathan. Trocado por papel — "a segunda pessoa da casa", "quem paga a maioria
+das contas".
+
+Não é um vazamento de dado real: o nome que estava escrito é falso. É pior de
+outro jeito — documentação que apresenta invenção como fato. E encosta na regra
+do `README.md`: **nenhum nome de familiar entra neste repositório**, regra que
+já custou um commit de conserto uma vez (`f1f74cf`, "tira nome real de familiar
+dos arquivos de teste"). O nome verdadeiro foi dito na conversa e **fica na
+conversa**.
+
+Nos arquivos de teste "Marina" continua, e está certo: ali é dado fictício de
+propósito, como o "Jonathan" que também é só um rótulo da bancada.
+
 ### O que falta
 
 1. Rodar `sql/09_parcelas.sql` no banco — **antes do merge**, pela mesma razão
@@ -876,8 +893,8 @@ ou do painel do Supabase.
    chegou perto do meio-dia. É a medição que decide se o GitHub serve ou se a
    conversa do `pg_cron` volta. Primeira execução do cron novo: 15:17 UTC.
 2. **Rodar `sql/08_avisos_por_pessoa.sql` e mesclar o bloco 7.**
-3. **A Marina entra no app** e liga os avisos no iPhone dela. Sem isso o bloco
-   7 não tem para onde mandar as 20h.
+3. **A segunda pessoa da casa entra no app** e liga os avisos no iPhone dela.
+   Sem isso o bloco 7 não tem para onde mandar as 20h.
 4. **Realtime com dois aparelhos** — a última coisa da fase 1 sem prova.
 5. Rodar `sql/04_prova_rls.sql` depois das migrações de 05/09.
 6. Depois: bloco 9 (parcelas), bloco 8 (código colado).

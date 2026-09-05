@@ -2,8 +2,9 @@
 -- Nossas Contas — bloco 7: cada um recebe o aviso que quer.
 --
 -- Até aqui o robô montava UMA mensagem por casa e mandava para todos os
--- aparelhos dela. Quem paga a maioria das contas é a Marina, e ela quer só o
--- aviso das 20h; o Jonathan quer os três. Então o laço passa a ser por pessoa.
+-- aparelhos dela. Quem paga a maioria das contas quer só o aviso das 20h; o
+-- Jonathan quer os três. Então o laço passa a ser por pessoa.
+-- (Nome de familiar não entra no repositório — é regra do projeto.)
 -- Idempotente.
 -- ============================================================
 
