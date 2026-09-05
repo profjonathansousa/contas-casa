@@ -145,6 +145,22 @@ button { border: 0; background: none; cursor: pointer; }
 /* "5/12" na linha do mês: discreto, mas responde à pergunta que a pessoa faz
    olhando a conta — falta muito? */
 .parcela { font-size: 13px; color: var(--fraco); margin-top: 2px; }
+
+/* o código de pagamento na linha: um toque copia, segurar abre para trocar */
+.codigo {
+  background: none; border: 0; padding: 3px 0 0; display: block; text-align: left;
+  font-size: 13px; color: var(--pago); font-weight: 600;
+}
+.codigo.vazio { color: var(--fraco); font-weight: 400; }
+.codigo:active { opacity: .6; }
+.cd-leitura { margin: 8px 2px 0; font-size: 14px; line-height: 1.35; }
+.cd-leitura.bom  { color: var(--pago); }
+.cd-leitura.ruim { color: var(--alerta); }
+#cd-texto {
+  width: 100%; box-sizing: border-box; padding: 12px; border-radius: var(--raio);
+  border: 1px solid var(--borda); background: var(--fundo); color: var(--texto);
+  font-size: 15px; font-family: inherit; resize: none;
+}
 .item.pago .parcela { opacity: .7; }
 .dia {
   font-size: 13px; font-weight: 700; color: var(--fraco);

@@ -103,10 +103,20 @@ function montarVespera(r) {
 
   const nomes = (r.titulos_amanha || []).slice(0, 4).join(', ');
   const resto = (r.titulos_amanha || []).length - 4;
+
+  // O pedido que originou o bloco 8: em vez de só informar, dizer o que falta
+  // fazer. Campo ausente quer dizer banco ainda sem o sql/10 — e aí o aviso
+  // não afirma que está tudo pronto, porque não sabe.
+  const semCodigo = r.sem_codigo_amanha;
+  const pedido = semCodigo == null ? 'deixe o pagamento pronto'
+               : semCodigo === 0   ? 'pagamento já preparado'
+               : semCodigo === 1   ? 'falta colar 1 código no app'
+               : `faltam colar ${semCodigo} códigos no app`;
+
   return {
     titulo: n === 1 ? '1 conta vence amanhã' : `${n} contas vencem amanhã`,
     corpo: nomes + (resto > 0 ? ` e mais ${resto}` : '')
-         + ' — ' + dinheiro(r.valor_amanha) + ' · deixe o pagamento pronto',
+         + ' — ' + dinheiro(r.valor_amanha) + ' · ' + pedido,
     tag: 'vespera-' + r.dia
   };
 }

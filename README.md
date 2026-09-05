@@ -33,7 +33,8 @@ CONTAS_CASA/
 │   ├── 06_push.sql            inscrições de aviso + resumo_do_dia()
 │   ├── 07_avisos.sql          memória de aviso enviado (um por dia e por slot)
 │   ├── 08_avisos_por_pessoa.sql  preferência de aviso por pessoa + véspera
-│   └── 09_parcelas.sql        contas que acabam: 12 vezes a partir de tal mês
+│   ├── 09_parcelas.sql        contas que acabam: 12 vezes a partir de tal mês
+│   └── 10_codigo_pagamento.sql  código de barras e PIX guardados no lançamento
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -73,6 +74,32 @@ O contador mora em coluna própria, não na descrição — descrição que muda
 mês faria a mesma conta entrar de novo toda vez, porque é por descrição que o
 banco compara.
 
+## Código de pagamento
+
+Cada conta guarda o código de barras ou o PIX copia-e-cola. Um toque em
+**"copiar código"** na linha devolve ele para a área de transferência na hora
+de pagar; **segurar** abre para trocar ou tirar.
+
+O app **lê o código sem chamar ninguém**: os 47 dígitos do boleto carregam o
+valor e o fator de vencimento, os 48 da conta de consumo carregam o valor, e o
+PIX é um BR Code com CRC. Então, ao colar, ele confere os dígitos verificadores
+e diz o que entendeu — *"Boleto · R$ 212,30 · vence 10/09"* — antes de guardar.
+**Se a conta ainda estava sem valor, o valor vem do código**: é o fim do "???"
+no gesto de colar. Se você já tinha digitado um valor, o seu manda.
+
+Código que não fecha os dígitos é recusado. Aqui recusar é o certo: dígito
+verificador é garantia de quem emitiu, e código truncado é pior do que nenhum,
+porque na hora de pagar você confiaria nele.
+
+O que **não** existe, e não vai existir: buscar boletos pelo seu CPF. Isso é o
+DDA, operado pela Nuclea, e o acesso é de instituição financeira. O único
+caminho seria entregar credencial de banco a um intermediário, o que inverteria
+o modelo de risco deste projeto inteiro.
+
+Uma conta fixa pode guardar um **PIX estático** — chave sem valor, que não muda
+de mês. Esse o "Trazer contas fixas" copia sozinho para o mês novo. A linha
+digitável do boleto não: ela muda todo mês, porque carrega vencimento e valor.
+
 ## Como se usa
 
 Um toque em qualquer ponto da linha **marca ou desmarca pago**, sem confirmação
@@ -93,7 +120,7 @@ desliga cada um.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
 onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 121 / 4 / 24 / 45 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 140 / 4 / 24 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 

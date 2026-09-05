@@ -147,6 +147,24 @@
   <p id="erro-parcelas" class="erro" hidden></p>
 </form>
 
+<!-- ---------- codigo de pagamento ---------- -->
+<div id="fundo-codigo" class="fundo" hidden></div>
+<form id="folha-codigo" class="folha" hidden>
+  <h2>Código de pagamento</h2>
+  <p id="cd-desc" class="ap-desc"></p>
+  <label for="cd-texto">Cole o código de barras ou o PIX copia-e-cola</label>
+  <!-- sem inputmode de propósito: PIX tem letras, e prender o teclado no
+       numérico foi o erro que travou o campo do mês em 05/09 -->
+  <textarea id="cd-texto" rows="3" autocapitalize="off" autocorrect="off"
+            spellcheck="false"></textarea>
+  <p id="cd-leitura" class="cd-leitura" hidden></p>
+  <div class="botoes">
+    <button type="button" id="cd-tirar" class="secundario">Tirar</button>
+    <button type="submit" id="cd-salvar">Guardar</button>
+  </div>
+  <p id="erro-codigo" class="erro" hidden></p>
+</form>
+
 <div id="aviso" class="aviso" hidden></div>
 
 <script src="vendor/supabase.js"></script>

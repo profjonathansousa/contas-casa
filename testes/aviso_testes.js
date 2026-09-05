@@ -125,6 +125,22 @@ print('  (e conta atrasada nao entra na vespera: ela e assunto dos avisos do dia
 medir('atrasada nao vira vespera', montarVespera({ dia: '2026-09-09', vencem_amanha: 0,
   valor_amanha: 0, atrasadas: 5, valor_atrasado: 900, titulos_amanha: null }), null);
 
+print('\n== a vespera diz o que falta preparar ==');
+print('  (era o pedido original: em vez de so informar, pedir uma acao)');
+function vespera(quantas, semCodigo) {
+  return montarVespera({ dia: '2026-09-09', vencem_amanha: quantas, valor_amanha: 100,
+    titulos_amanha: ['Luz', 'Agua'].slice(0, quantas), sem_codigo_amanha: semCodigo }).corpo;
+}
+medir('nenhum codigo colado',  vespera(2, 2), 'Luz, Agua — R$ 100,00 · faltam colar 2 códigos no app');
+medir('falta um',              vespera(2, 1), 'Luz, Agua — R$ 100,00 · falta colar 1 código no app');
+medir('esta tudo pronto',      vespera(2, 0), 'Luz, Agua — R$ 100,00 · pagamento já preparado');
+
+print('\n  -- CONTROLE NEGATIVO --');
+print('  (banco sem o sql/10 nao devolve o campo; o aviso NAO pode afirmar');
+print('   que esta tudo pronto quando ele nem sabe)');
+medir('sem o campo, nao afirma nada', vespera(2, undefined),
+      'Luz, Agua — R$ 100,00 · deixe o pagamento pronto');
+
 print('\n== cada slot puxa a coluna certa do perfil ==');
 medir('vespera',  colunaDoSlot('vespera_20h'), 'avisa_vespera_20h');
 medir('meio-dia', colunaDoSlot('dia_12h'),     'avisa_dia_12h');

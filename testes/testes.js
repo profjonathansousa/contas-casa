@@ -331,8 +331,13 @@ q('#mes-ant').disparar('click'); esperar();
 function itemPorDesc(d) {
   return itensDesenhados().filter(function (i) { return i.filhos[1].filhos[0]._txt === d; })[0];
 }
-medir('contador na linha', itemPorDesc('Cartao azul').filhos[1].filhos[1]._txt, '5/12');
-medir('conta comum nao ganha contador', itemPorDesc('Luz').filhos[1].filhos.length, 1);
+function partesDo(item, classe) {
+  return item.filhos[1].filhos.filter(function (f) { return f.className.indexOf(classe) === 0; });
+}
+medir('contador na linha', partesDo(itemPorDesc('Cartao azul'), 'parcela')[0]._txt, '5/12');
+print('  (medir por classe, e nao contando filhos: contar filhos quebra sozinho');
+print('   quando a linha ganha qualquer coisa nova, como ja quebrou)');
+medir('conta comum nao ganha contador', partesDo(itemPorDesc('Luz'), 'parcela').length, 0);
 
 print('\n  -- CONTROLE NEGATIVO --');
 print('  (parcelada que acabou NAO pode continuar sendo oferecida)');
@@ -434,6 +439,91 @@ medir('mandou nulo nos dois',
       [LOG.updates[upR].valores.parcelas_total, LOG.updates[upR].valores.parcela_1],
       [null, null]);
 medir('e a fixa volta a ser so "todo dia"', subtitulo(fixaPorDesc('Condominio')), 'todo dia 31');
+
+print('\n== 16. o codigo de pagamento colado ==');
+print('  (o app nao busca boleto nenhum: le o que voce ja tem na mao)');
+// geradores da bancada: montam codigos VALIDOS de mentira, para o app real ler
+function g10(n){var s=0,p=2;for(var i=n.length-1;i>=0;i--){var x=(+n[i])*p;if(x>9)x=Math.floor(x/10)+(x%10);s+=x;p=p===2?1:2;}return (10-(s%10))%10;}
+function g11(n){var s=0,p=2;for(var i=n.length-1;i>=0;i--){s+=(+n[i])*p;p=p===9?2:p+1;}var d=11-(s%11);return (d===0||d===10||d===11)?1:d;}
+function boletoDeMentira(centavos, vencIso) {
+  var base = Date.UTC(2022, 4, 29), p = vencIso.split('-');
+  var fator = String(Math.round((Date.UTC(+p[0],+p[1]-1,+p[2]) - base) / 86400000)).padStart(4,'0');
+  var valor = String(centavos).padStart(10,'0'), livre = '1234567890123456789012345';
+  var dv = g11('0019' + fator + valor + livre);
+  var c1 = '0019' + livre.slice(0,5), c2 = livre.slice(5,15), c3 = livre.slice(15,25);
+  return c1 + g10(c1) + c2 + g10(c2) + c3 + g10(c3) + dv + fator + valor;
+}
+function chipDe(item) { return partesDo(item, 'codigo')[0]; }
+
+q('#mes-prox').disparar('click'); esperar();
+q('#mes-ant').disparar('click'); esperar();
+var luz = itemPorDesc('Luz');
+medir('conta sem codigo convida a por um', chipDe(luz)._txt, '+ código');
+
+print('\n  -- colar um boleto: o app diz o que entendeu, antes de salvar --');
+chipDe(luz).disparar('click');
+medir('abriu a folha', q('#folha-codigo').hidden, false);
+medir('diz qual conta', q('#cd-desc')._txt, 'Luz');
+var bol = boletoDeMentira(21230, '2026-09-10');
+q('#cd-texto').value = bol;
+q('#cd-texto').disparar('input');
+medir('leu tipo, valor e vencimento', q('#cd-leitura')._txt,
+      'Boleto · R$ 212,30 · vence 10/09');
+
+print('\n  -- guardar preenche o "???" sozinho --');
+var upC = LOG.updates.length;
+q('#folha-codigo').disparar('submit');
+esperar();
+medir('campos no update', LOG.updates[upC].campos.slice().sort(),
+      ['codigo_pagamento', 'codigo_tipo', 'valor_previsto']);
+medir('tipo lido do proprio codigo', LOG.updates[upC].valores.codigo_tipo, 'boleto');
+medir('valor veio do codigo', LOG.updates[upC].valores.valor_previsto, 212.30);
+medir('guardou so os digitos', LOG.updates[upC].valores.codigo_pagamento, bol);
+medir('folha fechou', q('#folha-codigo').hidden, true);
+medir('o chip agora oferece copiar', chipDe(itemPorDesc('Luz'))._txt, 'copiar código');
+
+print('\n  -- CONTROLE NEGATIVO --');
+print('  (conta que JA tem valor nao pode ser sobrescrita pelo codigo)');
+var aluguel = itemPorDesc('Aluguel');
+chipDe(aluguel).disparar('click');
+q('#cd-texto').value = boletoDeMentira(99900, '2026-09-05');
+q('#cd-texto').disparar('input');
+var upD = LOG.updates.length;
+q('#folha-codigo').disparar('submit');
+esperar();
+medir('nao mexeu no valor', LOG.updates[upD].campos.slice().sort(),
+      ['codigo_pagamento', 'codigo_tipo']);
+
+print('  (codigo quebrado NAO pode ser guardado: na hora de pagar a pessoa confiaria nele)');
+chipDe(itemPorDesc('Internet')).disparar('click');
+var quebrado = bol.slice(0, 20) + (bol[20] === '9' ? '8' : '9') + bol.slice(21);
+q('#cd-texto').value = quebrado;
+q('#cd-texto').disparar('input');
+var upE = LOG.updates.length;
+q('#folha-codigo').disparar('submit');
+esperar();
+medir('recusou', LOG.updates.length - upE, 0);
+medir('e explicou', q('#erro-codigo')._txt,
+      'Os dígitos não fecham. Confira se o código veio inteiro.');
+medir('folha continua aberta', q('#folha-codigo').hidden, false);
+
+print('  (segurar no chip abre a folha e NAO apaga a conta)');
+q('#fundo-codigo').disparar('click');
+var delAntes = LOG.deletes.length;
+chipDe(itemPorDesc('Luz')).disparar('pointerdown');
+avancarTempo(700);
+medir('abriu a folha', q('#folha-codigo').hidden, false);
+medir('nao pediu para apagar', q('#folha-apagar').hidden, true);
+medir('nem apagou', LOG.deletes.length - delAntes, 0);
+
+print('\n  -- tirar o codigo --');
+var upF = LOG.updates.length;
+q('#cd-tirar').disparar('click');
+esperar();
+medir('mandou nulo nos dois',
+      [LOG.updates[upF].valores.codigo_pagamento, LOG.updates[upF].valores.codigo_tipo],
+      [null, null]);
+medir('o chip volta a convidar', chipDe(itemPorDesc('Luz'))._txt, '+ código');
 
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

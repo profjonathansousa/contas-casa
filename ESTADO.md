@@ -58,7 +58,8 @@ A terceira coluna é a que quase sempre falta.
 | **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
 | **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
 | **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
-| **contas que acabam (parcelas)** | sim (bloco 9) | sim (121/4/24/45) | **não — no ar, mas nenhuma conta foi marcada como parcelada ainda** |
+| **contas que acabam (parcelas)** | sim (bloco 9) | sim | **não — no ar, mas nenhuma conta foi marcada como parcelada ainda** |
+| **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — espera `sql/10` e merge** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -915,6 +916,91 @@ propósito, como o "Jonathan" que também é só um rótulo da bancada.
 tocar na linha "todo dia N" de cada uma e dizer quantas parcelas e o mês da
 primeira. Quais são elas está no banco e na conversa, **não aqui**. Enquanto
 isso não for feito, o bloco 9 está no ar sem estar em uso.
+
+## Bloco 8 — o código de pagamento colado (05/09/2026)
+
+**Escrito e medido. Espera `sql/10` e merge.**
+
+Fecha o pedido que abriu esta conversa: *"conta x vencendo amanhã, cole o
+código de pagamento no app"*.
+
+### O que ficou de fora, e por quê
+
+Buscar boleto pelo CPF é o **DDA**, operado pela Nuclea; o acesso é de
+instituição financeira. Existem APIs comerciais (Celcoin, TecnoSpeed), mas são
+B2B, com CNPJ e contrato. O único caminho para uma pessoa física seria um
+agregador com a credencial do banco dela — o que inverteria o modelo de risco
+do projeto inteiro. Jonathan cola.
+
+### A aritmética, que é o coração do bloco
+
+Tudo offline: nenhuma chamada de rede, nenhum terceiro, nenhuma credencial.
+
+- **Boleto bancário (47 dígitos):** módulo 10 nos três campos, módulo 11 no
+  dígito geral, valor nos últimos dez dígitos e vencimento no fator.
+- **O fator estourou.** Ele tem quatro dígitos, chegou a 9999 em 21/02/2025 e a
+  FEBRABAN reiniciou em 1000 no dia 22 (FB-009/2023). São **dois ciclos com
+  bases diferentes** — 07/10/1997 e 29/05/2022 — e o mesmo número quer dizer
+  datas diferentes em cada um. A regra escolhida: vale o ciclo novo; se ele
+  jogar a conta para daqui a mais de dois anos, o código é do velho. Confirmado
+  numericamente: 1997-10-07 + 9999 dias = 2025-02-21, o dia anterior à virada.
+  **Sem isso, toda data lida sairia errada.**
+- **Arrecadação (48 dígitos, começa com 8):** quatro blocos, e o 3º dígito diz
+  se o verificador é módulo 10 ou 11 — e as duas variantes têm regras de resto
+  diferentes das do boleto bancário. Se o dígito mentir, a outra variante é
+  tentada: recusar conta boa é pior do que aceitar um código que o banco vai
+  conferir de novo.
+- **PIX:** TLV do BR Code com CRC16-CCITT. É o CRC que pega o "colei pela
+  metade". Distingue cobrança **dinâmica** (que expira) da estática.
+
+Cada algoritmo foi provado por **ida e volta** antes de entrar no `app.js`: a
+bancada gera um código válido de mentira e o app real lê de volta.
+
+### Na tela
+
+O chip fica na linha, embaixo da descrição: **"+ código"** quando não há, e
+**"copiar código"** quando há. Toque copia, segurar abre para trocar ou tirar —
+mesmo vocabulário do resto do app, nenhum gesto novo para aprender. O
+`stopPropagation` impede que segurar ali vire "apagar a conta", e isso é
+medido.
+
+Ao colar, o app diz o que entendeu **antes** de salvar. E **se a conta estava
+sem valor, o valor vem do código** — o "???" morre no gesto de colar. Se já
+havia valor digitado, o da pessoa manda.
+
+**Código que não fecha os dígitos é recusado.** Aqui recusar é o certo, ao
+contrário do campo do mês: o dígito verificador é garantia de quem emitiu, e
+código truncado é pior do que nenhum, porque na hora de pagar a pessoa
+confiaria nele.
+
+O campo de colar **não tem `inputmode`**, de propósito: PIX tem letras, e
+prender o teclado no numérico foi exatamente o erro que travou o campo do mês
+horas antes.
+
+### O aviso da véspera fecha o ciclo
+
+Passa a dizer o que falta preparar: *"faltam colar 2 códigos no app"*, *"falta
+colar 1 código"*, ou *"pagamento já preparado"*. E se o banco ainda não tiver o
+`sql/10`, o campo não vem e o aviso volta ao texto antigo — **não afirma que
+está tudo pronto quando não sabe**. Medido com controle negativo.
+
+### Privacidade
+
+Linha digitável e PIX são dado de pagamento: identificam beneficiário e valor.
+Ficam sob a mesma RLS, entram no cache do `localStorage` (que o logout já
+limpa, desde a fase 0) e **nunca no repositório** — os códigos das medidas são
+gerados na hora pela bancada, com dígitos de mentira.
+
+Bancada: **140 / 4 / 24 / 49**, 0 falhas. Vinte medidas novas na tela e quatro
+no texto do aviso, com controles negativos para código quebrado, conta que já
+tem valor e segurar sem apagar.
+
+### O que falta
+
+1. Rodar `sql/10_codigo_pagamento.sql` — **antes do merge**, pela terceira vez
+   pela mesma razão.
+2. Mesclar.
+3. Colar o primeiro código de verdade e conferir no aparelho.
 
 ## VALIDAÇÕES MANUAIS PENDENTES
 

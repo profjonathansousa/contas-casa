@@ -28,12 +28,15 @@ var el = {
   pref12: $('#pref-12h'), pref20: $('#pref-20h'),
   fundoParcelas: $('#fundo-parcelas'), folhaParcelas: $('#folha-parcelas'),
   pcDesc: $('#pc-desc'), pcTotal: $('#pc-total'), pcMes: $('#pc-mes'),
-  pcCancelar: $('#pc-cancelar'), erroParcelas: $('#erro-parcelas')
+  pcCancelar: $('#pc-cancelar'), erroParcelas: $('#erro-parcelas'),
+  fundoCodigo: $('#fundo-codigo'), folhaCodigo: $('#folha-codigo'),
+  cdDesc: $('#cd-desc'), cdTexto: $('#cd-texto'), cdLeitura: $('#cd-leitura'),
+  cdTirar: $('#cd-tirar'), erroCodigo: $('#erro-codigo')
 };
 
 var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
               'valor_previsto,valor_pago,pago,pago_em,pago_por,' +
-              'parcela_n,parcela_de';
+              'parcela_n,parcela_de,codigo_pagamento,codigo_tipo';
 
 var eu = null;        // { id, casa_id, nome }
 var nomes = {};       // id do perfil -> primeiro nome
@@ -46,7 +49,7 @@ var paraApagar = null;      // item aguardando confirmação de exclusão
 var tipoApagar = 'lancamento';
 var modoFolha = 'lancamento';   // a folha de "+" serve às duas telas
 var modelos = [];               // contas fixas
-var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo,parcelas_total,parcela_1';
+var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo,parcelas_total,parcela_1,pix_estatico';
 var COLUNAS_PERFIL = 'id, casa_id, nome, avisa_vespera_20h, avisa_dia_12h, avisa_dia_20h';
 
 // Os três avisos do dia, e a coluna do perfil que manda em cada um. A
@@ -86,6 +89,156 @@ function paraNumero(txt) {
   var n = Number(s);
   if (!isFinite(n) || n < 0) return NaN;
   return Math.round(n * 100) / 100;
+}
+
+/* ---------- código de pagamento: ler sem chamar ninguém ----------
+
+   Tudo aqui é aritmética em cima do que foi colado. Nenhuma chamada de rede,
+   nenhum terceiro, nenhuma credencial. O app não busca boleto: ele lê o que
+   você já tem na mão.
+
+   As três formas que chegam num celular brasileiro:
+   - boleto bancário: 47 dígitos, com fator de vencimento e valor embutidos
+   - arrecadação (água, luz, tributos): 48 dígitos, começa com 8, sem data
+   - PIX copia-e-cola: texto EMV terminado em CRC16                         */
+
+function soDigitos(s) { return String(s == null ? '' : s).replace(/\D/g, ''); }
+
+// Dígito verificador dos campos da linha digitável.
+function mod10(num) {
+  var soma = 0, peso = 2;
+  for (var i = num.length - 1; i >= 0; i--) {
+    var p = (+num[i]) * peso;
+    if (p > 9) p = Math.floor(p / 10) + (p % 10);
+    soma += p;
+    peso = peso === 2 ? 1 : 2;
+  }
+  return (10 - (soma % 10)) % 10;
+}
+
+// Dígito geral do código de barras. A regra do resto muda entre o boleto
+// bancário (0, 10 e 11 viram 1) e o de arrecadação (viram 0) — são duas
+// especificações diferentes, e trocá-las recusa boleto bom.
+function mod11(num, arrecadacao) {
+  var soma = 0, peso = 2;
+  for (var i = num.length - 1; i >= 0; i--) {
+    soma += (+num[i]) * peso;
+    peso = peso === 9 ? 2 : peso + 1;
+  }
+  var dv = 11 - (soma % 11);
+  if (arrecadacao) return dv > 9 ? 0 : dv;
+  return (dv === 0 || dv === 10 || dv === 11) ? 1 : dv;
+}
+
+// O fator de vencimento tem quatro dígitos e por isso estourou: em 21/02/2025
+// chegou a 9999 e, em 22/02/2025, a FEBRABAN reiniciou a contagem em 1000
+// (FB-009/2023). São dois ciclos com bases diferentes, e o mesmo número quer
+// dizer datas diferentes em cada um. Regra: vale o ciclo novo; se ele jogar a
+// conta para daqui a mais de dois anos, o código é do ciclo velho.
+var BASE_FATOR_VELHA = Date.UTC(1997, 9, 7);
+var BASE_FATOR_NOVA  = Date.UTC(2022, 4, 29);
+function dataDoFator(fator) {
+  if (!fator || fator === '0000') return null;            // boleto sem vencimento
+  var f = +fator;
+  var nova = BASE_FATOR_NOVA + f * 86400000;
+  var limite = Date.now() + 730 * 86400000;
+  var ms = nova <= limite ? nova : BASE_FATOR_VELHA + f * 86400000;
+  var d = new Date(ms);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0')
+       + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+
+function lerBoleto(s) {
+  var c1 = s.slice(0, 9), c2 = s.slice(10, 20), c3 = s.slice(21, 31);
+  if (mod10(c1) !== +s[9] || mod10(c2) !== +s[20] || mod10(c3) !== +s[31]) {
+    return { erro: 'Os dígitos não fecham. Confira se o código veio inteiro.' };
+  }
+  var fator = s.slice(33, 37), valor = s.slice(37, 47);
+  // o código de barras é a linha digitável remontada em outra ordem
+  var semDV = s.slice(0, 4) + fator + valor + c1.slice(4) + c2 + c3;
+  if (mod11(semDV, false) !== +s[32]) {
+    return { erro: 'Os dígitos não fecham. Confira se o código veio inteiro.' };
+  }
+  return { tipo: 'boleto', valor: (+valor) / 100 || null, vencimento: dataDoFator(fator) };
+}
+
+function lerArrecadacao(s) {
+  // o 3º dígito diz qual módulo vale; se ele mentir, o outro é tentado, porque
+  // recusar conta boa é pior do que aceitar um código que o banco vai conferir
+  var primeiro = (s[2] === '6' || s[2] === '7');
+  var tentativas = [primeiro, !primeiro];
+  for (var k = 0; k < tentativas.length; k++) {
+    var dez = tentativas[k], bom = true, barras = '';
+    for (var i = 0; i < 4; i++) {
+      var bloco = s.slice(i * 12, i * 12 + 11);
+      var dv = dez ? mod10(bloco) : mod11(bloco, true);
+      if (dv !== +s[i * 12 + 11]) { bom = false; break; }
+      barras += bloco;
+    }
+    if (bom) {
+      return { tipo: 'arrecadacao', valor: (+barras.slice(4, 15)) / 100 || null,
+               vencimento: null };
+    }
+  }
+  return { erro: 'Os dígitos não fecham. Confira se o código veio inteiro.' };
+}
+
+// CRC16-CCITT, como o BR Code manda. É ele que pega o "colei pela metade".
+function crc16(txt) {
+  var crc = 0xFFFF;
+  for (var i = 0; i < txt.length; i++) {
+    crc ^= (txt.charCodeAt(i) & 0xFF) << 8;
+    for (var b = 0; b < 8; b++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function lerPix(txt) {
+  var s = String(txt).trim();
+  if (s.length < 12 || s.slice(-8, -4) !== '6304') {
+    return { erro: 'Isso não parece um código PIX inteiro.' };
+  }
+  if (crc16(s.slice(0, -4)) !== s.slice(-4).toUpperCase()) {
+    return { erro: 'O código PIX veio quebrado. Copie de novo, inteiro.' };
+  }
+  var campos = {}, i = 0, corpo = s.slice(0, -8);
+  while (i + 4 <= corpo.length) {
+    var id = corpo.slice(i, i + 2), n = +corpo.slice(i + 2, i + 4);
+    if (isNaN(n)) break;
+    campos[id] = corpo.slice(i + 4, i + 4 + n);
+    i += 4 + n;
+  }
+  return {
+    tipo: 'pix',
+    valor: campos['54'] ? Number(campos['54']) : null,
+    vencimento: null,
+    beneficiario: campos['59'] || null,
+    // cobrança dinâmica expira; a estática não, e só ela cabe numa conta fixa
+    dinamico: campos['01'] === '12'
+  };
+}
+
+// A porta única: recebe o que foi colado e diz o que entendeu.
+function lerCodigo(texto) {
+  var bruto = String(texto == null ? '' : texto).trim();
+  if (!bruto) return { erro: 'Cole o código primeiro.' };
+
+  var digitos = soDigitos(bruto);
+  var soNumeros = /^[\d\s.]+$/.test(bruto);
+
+  if (soNumeros) {
+    if (digitos.length === 47) return lerBoleto(digitos);
+    if (digitos.length === 48 && digitos[0] === '8') return lerArrecadacao(digitos);
+    if (digitos.length === 44) {
+      return { erro: 'Esse é o código de barras. Preciso da linha digitável, '
+                   + 'a de 47 números.' };
+    }
+    return { erro: 'Número com ' + digitos.length + ' dígitos não é boleto '
+                 + '(são 47) nem conta de consumo (48).' };
+  }
+  return lerPix(bruto);
 }
 
 /* ---------- parcelas ---------- */
@@ -367,6 +520,8 @@ function linha(it) {
   // segurar o dedo no valor não pode apagar a conta
   valor.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
 
+  corpo.appendChild(chipCodigo(it));
+
   ligarToques(div, function () { alternarPago(it); }, function () { pedirApagar(it, 'lancamento'); });
 
   div.appendChild(marca);
@@ -374,6 +529,114 @@ function linha(it) {
   div.appendChild(valor);
   return div;
 }
+
+var NOME_TIPO = { boleto: 'Boleto', arrecadacao: 'Conta de consumo', pix: 'PIX' };
+
+// Um toque copia; segurar abre para trocar ou tirar. É o mesmo vocabulário da
+// linha (toque faz o comum, segurar faz o raro), então não há gesto novo para
+// aprender. O stopPropagation impede que segurar aqui vire "apagar a conta".
+function chipCodigo(it) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'codigo' + (it.codigo_pagamento ? '' : ' vazio');
+  b.textContent = it.codigo_pagamento ? 'copiar código' : '+ código';
+  b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+  b.addEventListener('click', function (ev) { ev.stopPropagation(); });
+  ligarToques(b,
+    function () { if (it.codigo_pagamento) copiarCodigo(it, b); else abrirCodigo(it); },
+    function () { abrirCodigo(it); });
+  return b;
+}
+
+async function copiarCodigo(it, botao) {
+  try {
+    await navigator.clipboard.writeText(it.codigo_pagamento);
+    botao.textContent = 'copiado ✓';
+    if (navigator.vibrate) navigator.vibrate(8);
+    setTimeout(function () { botao.textContent = 'copiar código'; }, 2500);
+  } catch (e) {
+    aviso('Não consegui copiar sozinho. Segure aqui para ver o código.');
+  }
+}
+
+var lancEmCodigo = null;
+function abrirCodigo(it) {
+  lancEmCodigo = it;
+  el.cdDesc.textContent = it.descricao;
+  el.cdTexto.value = it.codigo_pagamento || '';
+  el.erroCodigo.hidden = true;
+  el.cdTirar.hidden = !it.codigo_pagamento;
+  mostrarLeitura();
+  el.fundoCodigo.hidden = false;
+  el.folhaCodigo.hidden = false;
+}
+function fecharCodigo() {
+  lancEmCodigo = null;
+  el.fundoCodigo.hidden = true;
+  el.folhaCodigo.hidden = true;
+}
+el.fundoCodigo.addEventListener('click', fecharCodigo);
+
+// Diz o que entendeu enquanto a pessoa cola, e não só depois de salvar.
+function mostrarLeitura() {
+  var cru = el.cdTexto.value;
+  el.cdLeitura.hidden = !String(cru).trim();
+  if (el.cdLeitura.hidden) return;
+  var r = lerCodigo(cru);
+  if (r.erro) {
+    el.cdLeitura.className = 'cd-leitura ruim';
+    el.cdLeitura.textContent = r.erro;
+    return;
+  }
+  var partes = [NOME_TIPO[r.tipo]];
+  if (r.beneficiario) partes.push(r.beneficiario);
+  if (r.valor) partes.push('R$ ' + reais(r.valor));
+  if (r.vencimento) partes.push('vence ' + ddmm(r.vencimento));
+  if (r.dinamico) partes.push('cobrança que expira');
+  el.cdLeitura.className = 'cd-leitura bom';
+  el.cdLeitura.textContent = partes.join(' · ');
+}
+el.cdTexto.addEventListener('input', mostrarLeitura);
+
+async function gravarCodigo(it, campos) {
+  var antes = { codigo_pagamento: it.codigo_pagamento, codigo_tipo: it.codigo_tipo,
+                valor_previsto: it.valor_previsto };
+  Object.keys(campos).forEach(function (k) { it[k] = campos[k]; });
+  fecharCodigo();
+  desenhar();
+  var r = await db.from('lancamento').update(campos).eq('id', it.id);
+  if (r.error) {
+    Object.keys(antes).forEach(function (k) { it[k] = antes[k]; });
+    desenhar();
+    aviso('Não deu para salvar. ' + r.error.message);
+  } else {
+    cacheGravar();
+  }
+}
+
+el.folhaCodigo.addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  var it = lancEmCodigo;
+  if (!it) return;
+  var r = lerCodigo(el.cdTexto.value);
+  // Aqui recusar é o certo, ao contrário do campo do mês: o dígito verificador
+  // é garantia de quem emitiu, e código truncado é pior do que nenhum — na
+  // hora de pagar a pessoa confiaria nele.
+  if (r.erro) { el.erroCodigo.textContent = r.erro; el.erroCodigo.hidden = false; return; }
+
+  var texto = r.tipo === 'pix' ? el.cdTexto.value.trim() : soDigitos(el.cdTexto.value);
+  var campos = { codigo_pagamento: texto, codigo_tipo: r.tipo };
+  // O código sabe o valor. Se a conta ainda não sabe, ela passa a saber — é o
+  // fim do "???" no gesto de colar. Se já sabe, o que a pessoa digitou manda.
+  if (r.valor && it.valor_previsto == null) campos.valor_previsto = r.valor;
+  await gravarCodigo(it, campos);
+});
+
+el.cdTirar.addEventListener('click', async function () {
+  var it = lancEmCodigo;
+  if (!it) return;
+  await gravarCodigo(it, { codigo_pagamento: null, codigo_tipo: null });
+});
 
 /* ---------- marcar pago ---------- */
 
