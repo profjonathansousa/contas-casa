@@ -21,9 +21,9 @@ A terceira coluna é a que quase sempre falta.
 | PWA instalável e service worker | sim | sim (23 medidas) | sim, no iPhone do Jonathan |
 | RLS isolando por casa | sim | sim (prova 04, com controle negativo) | sim |
 | **Realtime entre dois aparelhos** | sim | só o lado do app, com evento fabricado | **não** |
-| **Web Push: inscrever o aparelho** | sim | não (não dá para medir fora do navegador) | **sim: há 1 inscrição no banco** |
-| **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **não — nenhuma notificação chegou** |
-| **cron diário do aviso** | sim | não | **não — nunca rodou com o Secret posto** |
+| **Web Push: inscrever o aparelho** | sim | não (não dá para medir fora do navegador) | sim: 1 inscrição no banco |
+| **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **sim — chegou no iPhone; último envio 03/09/2026** |
+| **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasa de 3h35 a 4h15** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ## O que foi feito
@@ -342,6 +342,30 @@ os arquivos `sql/01_schema_rls.sql`, `sql/05_modelos.sql` e `sql/06_push.sql`.
 Os três são idempotentes. Enquanto isso não for feito, o banco em produção
 continua com os furos acima.**
 
+### O aviso diário funciona — e o cron atrasa horas
+
+Corrigido em 05/09/2026, depois de Jonathan avisar que recebeu notificação no
+iPhone. O que a auditoria mediu no Actions e no banco:
+
+| medição | resultado |
+|---|---|
+| execuções do "Aviso diário" em 01, 02, 03 e 04/09 | as quatro verdes |
+| último envio registrado em `push_inscricao.ultimo_envio` | 03/09/2026, 11:45 de Brasília |
+| dia 04/09 | rodou verde e **não enviou** — nada vencendo, nada atrasado |
+| aparelhos inscritos | 1 |
+
+O silêncio do dia 04 não é defeito: é a regra "só quando há o que dizer"
+funcionando. O bloco 5 dizia que faltava o Secret e faltava alguém inscrito;
+as duas coisas foram resolvidas por Jonathan e o ESTADO não tinha registrado.
+
+**O defeito real é a pontualidade.** O cron está agendado para 11:00 UTC
+(08:00 de Brasília) e disparou às 14:35, 14:44, 14:45 e 15:15 UTC nos quatro
+dias — de 3h35 a 4h15 de atraso, todo dia. O README dizia "de dez a sessenta
+minutos", que era o que a documentação do GitHub sugere; a medição diz outra
+coisa. Agendar em minuto `:00` é o pior caso, porque é onde todo mundo agenda.
+Qualquer aviso com hora marcada (o pedido das notificações de 12h e 20h)
+esbarra nisto primeiro.
+
 ### Realtime e Web Push: o que a auditoria pode e não pode dizer
 
 Não foi criada nenhuma camada nova. O que existe é o que já existia: o canal
@@ -375,16 +399,18 @@ dizia o bloco 5.
 Nenhuma delas pode ser feita por código; todas precisam de aparelho, de gente
 ou do painel do Supabase.
 
-1. **Rodar de novo os três SQLs** (`01`, `05`, `06`) no SQL Editor, para os
-   consertos de segurança valerem no banco. Depois, `sql/04_prova_rls.sql`
-   outra vez, que a medição 2 tem que continuar zerada.
-2. **Pôr `SUPABASE_SERVICE_ROLE` nos Secrets** — continua faltando:
-   `gh secret set SUPABASE_SERVICE_ROLE -R profjonathansousa/contas-casa`
-3. **Aviso diário, modo seco.** Actions > "Aviso diário das contas" > Run
-   workflow com **seco** marcado. Confere o texto sem mandar nada.
-4. **Aviso diário de verdade**, sem o seco. A notificação tem que chegar no
-   iPhone. Enquanto isso não acontecer, "Web Push feito" quer dizer só
-   "escrito".
+1. ~~Rodar de novo os três SQLs.~~ **Feito em 05/09/2026**, com autorização de
+   Jonathan, como a migração `fase_0_correcoes_de_seguranca` (só as partes que
+   mudaram; o resto dos arquivos já estava aplicado e igual). Provado no banco:
+   um `insert` tentando assinar como o outro morador, com data de 2000, foi
+   gravado com a hora de agora e sem autor forjado — e a prova foi desfeita por
+   `raise exception`, sem deixar linha nenhuma. O linter do Supabase caiu de 7
+   avisos para 2: `minha_casa` chamável por quem está logado (é de propósito, o
+   app precisa) e a proteção de senha vazada, que é um clique no painel.
+2. ~~Pôr `SUPABASE_SERVICE_ROLE` nos Secrets.~~ **Feito por Jonathan.**
+3. ~~Aviso diário, modo seco.~~ **Feito.**
+4. ~~Aviso diário de verdade.~~ **Feito: a notificação chegou no iPhone.**
+   Fica no lugar dela a pontualidade do cron, acima.
 5. **Realtime entre dois aparelhos.** Duas telas abertas na mesma casa, marcar
    pago numa e ver a outra mudar sozinha, sem recarregar.
 6. **Login da esposa**, e a inscrição do aparelho dela nos avisos.
@@ -394,12 +420,12 @@ ou do painel do Supabase.
 
 ## PRÓXIMA AÇÃO EXATA
 
-1. Rodar `sql/01_schema_rls.sql`, `sql/05_modelos.sql` e `sql/06_push.sql` no
-   SQL Editor (nesta ordem), e depois `sql/04_prova_rls.sql` para conferir que
-   a RLS continua de pé.
-2. Pôr o Secret `SUPABASE_SERVICE_ROLE`.
-3. Aviso diário em modo seco; conferir o texto.
-4. Aviso diário de verdade; a notificação tem que chegar.
-5. Testar o Realtime com dois aparelhos ao mesmo tempo.
-6. Só depois disso, escolher a fase 1 do plano novo: Telegram, parcelas ou
-   offline. Nada disso foi começado, e nada disso foi preparado de véspera.
+1. Resolver a **pontualidade do cron** antes de prometer qualquer aviso com
+   hora marcada. Primeiro tiro, de graça: sair do minuto `:00`.
+2. Testar o **Realtime com dois aparelhos** ao mesmo tempo — é a última coisa
+   da fase 1 sem validação.
+3. Rodar `sql/04_prova_rls.sql` para conferir que a RLS continua de pé depois
+   da migração de 05/09.
+4. Só então o que Jonathan pediu em 05/09: os três horários de aviso e o
+   código de barras / PIX colado no lançamento. Nada disso foi começado, e
+   nada disso foi preparado de véspera.
