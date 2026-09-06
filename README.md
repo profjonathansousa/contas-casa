@@ -207,9 +207,8 @@ cliente.
 
 ## Estado atual
 
-Os blocos **1 a 10** estão concluídos e no ar. O bloco **11** está
-implementado e medido, mas **ainda não no ar**: depende de aplicar
-`sql/11_geracao_automatica.sql` no banco antes do merge. A bancada fecha em
+Os blocos **1 a 11** estão concluídos e no ar. O `sql/11` foi aplicado no
+banco em 06/09/2026 e provado ali mesmo. A bancada fecha em
 `170 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
@@ -230,7 +229,7 @@ Os próximos blocos são, nesta ordem:
 
 | bloco | entrega | observação |
 |---|---|---|
-| ~~**11**~~ | ~~geração automática do mês~~ | feito em 06/09; falta aplicar o `sql/11` e mesclar |
+| ~~**11**~~ | ~~geração automática do mês~~ | no ar desde 06/09/2026 |
 | **13** | histórico | listar meses, previsto, pago, a pagar e número de contas |
 | **14** | receitas | nova tabela `receita`, separada de `lancamento` |
 | **12** | gráficos | só depois de histórico e receitas estabilizados |

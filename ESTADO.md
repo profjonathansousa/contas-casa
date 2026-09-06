@@ -1,16 +1,16 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 06/09/2026 — bloco 11 (geração automática do mês) implementado.
-NO AR até o bloco 10; o bloco 11 espera o `sql/11` no banco e o merge.
+Atualizado em 06/09/2026 — bloco 11 (geração automática do mês) **no ar**:
+`sql/11` aplicado no banco e provado em produção. Blocos 1 a 11 NO AR.
 
 ## ESTADO ATUAL
 
 ### O que está de pé
 
 - Blocos **1 a 10** concluídos e no ar.
-- Bloco **11** (o mês corrente nasce sozinho ao abrir o app) implementado e
-  medido, **ainda não no ar**: depende de aplicar `sql/11_geracao_automatica.sql`
-  no banco **antes** do merge, porque o app passa a chamar `garantir_mes()`.
+- Bloco **11** (o mês corrente nasce sozinho ao abrir o app) **no ar**:
+  `sql/11_geracao_automatica.sql` aplicado em 06/09/2026, provado em produção,
+  e o app mesclado depois disso.
 - Bancada verde em **170 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
@@ -49,7 +49,7 @@ A terceira coluna é a que quase sempre falta.
 | **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
 | **contas que acabam (parcelas)** | sim (bloco 9) | sim | **sim — confirmado por Jonathan em 05/09; 3 contas fixas já parceladas no banco** |
 | **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — no ar, mas nenhum código colado ainda** |
-| **o mês corrente nasce sozinho** | sim (bloco 11) | sim (bancada 170/4/27/49 com dois controles negativos + o `sql/11` exercitado numa réplica local, inclusive a concorrência com duas sessões) | **não — o `sql/11` ainda não foi aplicado no banco de produção** |
+| **o mês corrente nasce sozinho** | sim (bloco 11) | sim (bancada 170/4/27/49 com dois controles negativos + réplica local, inclusive concorrência com duas sessões) | **parcialmente — `sql/11` aplicado e provado em produção em 06/09; falta um aparelho de verdade abrir o app num mês novo** |
 | **trocar e recuperar a senha** | sim (bloco 10) | sim (os controles estão no placar atual) | **não — ainda não exercitado num aparelho depois do bloco 10** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
@@ -170,11 +170,10 @@ sobre agregações que depois mudam.
 
 ## PRÓXIMO PASSO
 
-1. **Aplicar `sql/11_geracao_automatica.sql` no banco e depois `sql/11_prova_geracao.sql`**,
-   conferindo as sete medições da prova — em especial que o backfill marcou
-   **exatamente 2** competências. Só então o merge: o app já chama
-   `garantir_mes()`, e sem a função no banco a abertura perde a geração
-   automática (o botão continua funcionando).
+1. **Abrir o app num aparelho** e confirmar que a tela do mês aparece normal.
+   Em 06/09 o mês corrente já estava marcado pelo backfill, então a primeira
+   geração automática de verdade só acontece em **01/10**: é nela que o bloco 11
+   se prova sozinho.
 2. **Colar o primeiro código de pagamento** e conferir que o valor vem
    sozinho — pendência do bloco 8.
 3. **A segunda pessoa da casa entra no app** e liga os avisos no aparelho
@@ -1540,3 +1539,48 @@ quando chama, com o quê, e o que faz com a resposta.
   naquele dia. Isso já era verdade com o botão, então não é regressão — mas é o
   argumento para, um dia, o robô também garantir o mês. **Fora do escopo do
   bloco 11.**
+
+### Aplicado em produção em 06/09/2026
+
+Migration `bloco_11_geracao_automatica_do_mes` aplicada no banco, e provada ali
+mesmo — não na réplica, no banco de verdade:
+
+| medição | resultado |
+|---|---|
+| chave primária de `mes_gerado` | `{casa_id, competencia}`, 2 checks |
+| RLS | ligada, **forçada**, e só a política `mes_gerado_ler` |
+| grants (`anon` lê / `anon` executa / eu leio / eu gravo / eu atualizo / eu apago / eu chamo / `anon` no `privado` / `anon` marca) | `f f t f f f t f f` |
+| índice | `unique (casa_id, competencia, modelo_id)`, sem `where` |
+| `privado.marcar_mes_corrente` | definer, `search_path=public`, **0 argumentos**, fora do `public` |
+| `public.garantir_mes` | **não** é definer, 0 argumentos |
+| backfill | **2** marcas, `2026-09-01` e `2026-10-01`, ambas `backfill` |
+| `geradas_sem_marca` / `marcas_sem_conta_gerada` | 0 / 0 |
+
+E as tentativas reais, sob um usuário de verdade da casa (`current_user =
+authenticated`), com tudo desfeito por subtransação:
+
+| tentativa | resultado |
+|---|---|
+| insert direto, mês passado | `42501 permission denied for table mes_gerado` |
+| insert direto, mês futuro | `42501 permission denied` |
+| insert direto, `origem = 'backfill'` | `42501 permission denied` |
+| insert direto, outra casa | `42501 permission denied` |
+| **insert direto, mês corrente da própria casa** | `42501 permission denied` |
+| `garantir_mes()` | `2026-09-01, criadas = 0` |
+| marcas depois de tudo | 2 — nada persistiu |
+| controle negativo: um uuid sem perfil | vê **0** marcas e **0** contas |
+
+O linter de segurança do Supabase confirma de fora: **nenhum alerta novo**. Em
+particular, `privado.marcar_mes_corrente` **não** aparece no aviso "signed-in
+users can execute SECURITY DEFINER function" — justamente porque mora fora do
+schema publicado. Continuam os três de sempre: `aviso_enviado` sem política (só
+o robô escreve, com `service_role`), `minha_casa()` definer e chamável
+(intencional, devolve a sua própria casa) e a proteção de senha vazada
+desligada, que é um clique no painel.
+
+**O que ainda não foi provado:** a primeira geração automática de verdade. Em
+06/09 o mês corrente já estava marcado pelo backfill, então `garantir_mes()`
+devolve zero — corretamente. É em **01/10**, quando alguém abrir o app, que o
+bloco se prova sozinho: `mes_gerado` deve ganhar uma linha `2026-10-01`... que
+já existe, também pelo backfill. Então o teste de verdade é **01/11**. Até lá,
+o que está provado é o mecanismo, não o ciclo completo.
