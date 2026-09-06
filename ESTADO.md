@@ -1084,7 +1084,31 @@ resposta não é óbvia.
 - A folha explica, na hora, por que a senha importa: o app instalado não
   enxerga a sessão do Safari, e o Chaveiro do iPhone deve guardar.
 
-Bancada: **154 / 4 / 24 / 49**, 0 falhas. Quatro medidas de controle negativo:
+### E o botão não fazia nada: a terceira vez no mesmo dia
+
+Publicado, Jonathan tocou em "trocar senha" no Safari e **não aconteceu nada**.
+Auditado antes de supor: os 66 seletores que o `app.js` procura existem todos
+no `index.html`, e os dois arquivos estão na `main`. Logo, o código estava
+certo — o aparelho é que rodava o **`app.js` velho com o `index.html` novo**. O
+botão aparecia (HTML) e não havia quem escutasse o toque (JS).
+
+Terceira vez no mesmo dia. O `no-cache` no service worker não bastou, e a razão
+é simples: ele só vale depois que o service worker novo assume, e a página já
+aberta continua com o script que carregou.
+
+Conserto que não depende de comportamento de cache: **versão no endereço**.
+`app.js?v=10`, `app.css?v=10`, `config.js?v=10`. Endereço novo é endereço que
+nenhum cache tem — não há como servir o velho. Ao subir a versão, muda-se nos
+dois arquivos, e **a bancada confere que o `sw.js` pede exatamente os endereços
+que o `index.html` pede**, com controle negativo para o endereço sem versão.
+
+Vale registrar a armadilha que escondeu isso das medidas: o `querySelector`
+falso da bancada **cria** o elemento quando não acha, enquanto o navegador
+devolve `null`. Um seletor errado passaria despercebido ali e derrubaria o
+`app.js` inteiro no aparelho. Desta vez não era isso — mas foi preciso conferir
+para saber.
+
+Bancada: **154 / 4 / 27 / 49**, 0 falhas. Quatro medidas de controle negativo:
 senhas diferentes não passam, senha curta não passa, "esqueci" sem e-mail não
 chama nada, e trocar senha não encosta em conta nenhuma.
 

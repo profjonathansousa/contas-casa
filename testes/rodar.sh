@@ -8,7 +8,7 @@
 # quebrada, que é pior do que não ter CI.
 set -e
 
-ESPERADO='154 / 4 / 24 / 49'
+ESPERADO='154 / 4 / 27 / 49'
 
 AQUI=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP=$(CDPATH= cd -- "$AQUI/.." && pwd)
@@ -79,7 +79,7 @@ fi
 cat "$PONTE" "$T/dir.js" "$T/p2.js" "$APP/app.js" "$AQUI/teste_semperfil.js" > "$T/b.js"
 rodar 'sem perfil' "$T/b.js"
 
-cat "$PONTE" "$AQUI/sw_prelude.js" "$APP/sw.js" "$AQUI/sw_testes.js" > "$T/c.js"
+cat "$PONTE" "$T/dir.js" "$AQUI/sw_prelude.js" "$APP/sw.js" "$AQUI/sw_testes.js" > "$T/c.js"
 rodar 'sw.js' "$T/c.js"
 
 cat "$PONTE" "$T/dir.js" "$AQUI/aviso_testes.js" > "$T/d.js"

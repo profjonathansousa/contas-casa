@@ -11,9 +11,22 @@ disparar('install', { waitUntil: function (p) { esperou = p; } });
 esperar();
 var caixa = GUARDADO[VERSAO] || {};
 medir('arquivos guardados', Object.keys(caixa).length, 11);
-medir('guardou o app.js', !!caixa['./app.js'], true);
 medir('guardou a biblioteca', !!caixa['./vendor/supabase.js'], true);
 medir('guardou o icone maskable', !!caixa['./icones/icone-maskable-512.png'], true);
+
+print('\n  -- a casca tem que pedir os MESMOS enderecos que a pagina --');
+print('  (HTML novo com JS velho ja aconteceu duas vezes em 05/09; o ?v= no');
+print('   endereco e o que impede, e so vale se os dois arquivos concordarem)');
+var htmlReal = readFile(DIR_APP + '/index.html');
+function enderecoNaPagina(arquivo) {
+  var m = new RegExp('(?:href|src)="(' + arquivo + '[^"]*)"').exec(htmlReal);
+  return m ? './' + m[1] : '(a pagina nao pede)';
+}
+['app.js', 'app.css', 'config.js'].forEach(function (arq) {
+  medir(arq + ': casca bate com a pagina', !!caixa[enderecoNaPagina(arq)], true);
+});
+print('  -- CONTROLE: endereco sem versao NAO pode estar na casca --');
+medir('app.js cru fora da casca', !!caixa['./app.js'], false);
 
 print('\n== activate: apaga versao velha ==');
 GUARDADO[VERSAO + '-velho'] = { velho: 1 };
