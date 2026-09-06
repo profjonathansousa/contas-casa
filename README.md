@@ -155,7 +155,11 @@ por pessoa, todas `default true`).
 (`'automatico'` ou `'backfill'`), chave primária `(casa_id, competencia)`. Uma
 linha quer dizer "esta competência desta casa já foi inicializada". É a trava
 que resolve dois aparelhos abrindo o app ao mesmo tempo, e é o que torna
-durável apagar uma conta. Sem UPDATE e sem DELETE, de propósito.
+durável apagar uma conta. Sem UPDATE e sem DELETE, de propósito — e o INSERT só
+aceita a própria casa, o mês corrente de São Paulo calculado no banco e
+`origem = 'automatico'`. Sem isso, um POST à mão marcando um mês futuro faria
+aquele mês nunca nascer. O `'backfill'` só entra pela migration, que roda como
+`postgres`.
 
 **lancamento** — `id`, `casa_id`, `modelo_id` (nulo em conta digitada na mão;
 preenchido no que veio das contas fixas), `competencia` (date, sempre dia 1 do

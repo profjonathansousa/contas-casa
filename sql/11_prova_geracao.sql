@@ -140,6 +140,95 @@ select 'controle negativo' as parte,
 reset role;
 select set_config('request.jwt.claims', null, false);
 
+-- ---------- medição 8: a policy de INSERT, tentada de verdade ----------
+-- A policy existir não prova nada: o que prova é tentar gravar e apanhar.
+-- Aqui a sessão vira um usuário REAL da casa e tenta as quatro marcas que o
+-- cliente não pode gravar, mais a que pode, mais o caminho do garantir_mes().
+--
+-- Nada fica no banco: cada tentativa roda numa subtransação do plpgsql, e as
+-- que dão certo são desfeitas por um raise de propósito.
+
+create temporary table _quem as
+select id as uid from public.perfil limit 1;
+
+select set_config(
+  'request.jwt.claims',
+  json_build_object('sub', (select uid from _quem), 'role', 'authenticated')::text,
+  false);
+set role authenticated;
+
+do $$
+declare
+  eu_casa uuid := public.minha_casa();
+  mes     date := date_trunc('month', (now() at time zone 'America/Sao_Paulo'))::date;
+  outra   uuid := '00000000-0000-0000-0000-0000000000ff';
+begin
+  raise notice 'casa: %  mes corrente no banco: %', eu_casa, mes;
+
+  begin
+    insert into public.mes_gerado (casa_id, competencia, origem)
+    values (eu_casa, (mes - interval '1 month')::date, 'automatico');
+    raise notice 'FALHA  mes PASSADO foi aceito';
+    raise exception 'desfazer' using errcode = 'P0001';
+  exception
+    when sqlstate 'P0001' then null;
+    when others then raise notice 'ok     mes passado recusado (%)', sqlstate;
+  end;
+
+  begin
+    insert into public.mes_gerado (casa_id, competencia, origem)
+    values (eu_casa, (mes + interval '1 month')::date, 'automatico');
+    raise notice 'FALHA  mes FUTURO foi aceito — este e o pior: o mes nunca nasceria';
+    raise exception 'desfazer' using errcode = 'P0001';
+  exception
+    when sqlstate 'P0001' then null;
+    when others then raise notice 'ok     mes futuro recusado (%)', sqlstate;
+  end;
+
+  begin
+    insert into public.mes_gerado (casa_id, competencia, origem)
+    values (eu_casa, mes, 'backfill');
+    raise notice 'FALHA  origem BACKFILL forjada foi aceita';
+    raise exception 'desfazer' using errcode = 'P0001';
+  exception
+    when sqlstate 'P0001' then null;
+    when others then raise notice 'ok     origem backfill recusada (%)', sqlstate;
+  end;
+
+  begin
+    insert into public.mes_gerado (casa_id, competencia, origem)
+    values (outra, mes, 'automatico');
+    raise notice 'FALHA  marca para OUTRA CASA foi aceita';
+    raise exception 'desfazer' using errcode = 'P0001';
+  exception
+    when sqlstate 'P0001' then null;
+    when others then raise notice 'ok     outra casa recusada (%)', sqlstate;
+  end;
+
+  begin
+    insert into public.mes_gerado (casa_id, competencia, origem)
+    values (eu_casa, mes, 'automatico');
+    raise exception 'desfazer' using errcode = 'P0001';
+  exception
+    when sqlstate 'P0001'       then raise notice 'ok     o caminho legitimo foi ACEITO (e desfeito)';
+    when unique_violation       then raise notice 'ok     a marca do mes corrente ja existe (a PK barrou depois da policy)';
+    when insufficient_privilege then raise notice 'FALHA  a policy recusou o caminho legitimo';
+    when others                 then raise notice 'FALHA  o caminho legitimo quebrou (%)', sqlstate;
+  end;
+
+  begin
+    perform * from public.garantir_mes();
+    raise exception 'desfazer' using errcode = 'P0001';
+  exception
+    when sqlstate 'P0001' then raise notice 'ok     garantir_mes() roda sob a policy nova (e foi desfeito)';
+    when others           then raise notice 'FALHA  garantir_mes() quebrou (%)', sqlstate;
+  end;
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', null, false);
+drop table _quem;
+
 -- ============================================================
 -- LEITURA DO RESULTADO
 --   1: t | {casa_id,competencia} | 2
@@ -149,5 +238,8 @@ select set_config('request.jwt.claims', null, false);
 --   5: security_definer falso nas duas, garantir_mes sem argumento
 --   6: 2 | 0 | 0 | 0   (as duas últimas colunas zero é o que importa)
 --   7: marcas_que_o_estranho_ve = 0            <- obrigatório
+--   8: seis linhas começando em "ok". Um único "FALHA" ali é buraco aberto:
+--      quer dizer que uma sessão logada pode gravar a marca de um mês que ela
+--      escolheu, e aquele mês nunca nascerá.
 -- Qualquer número diferente de zero na medição 7 é RLS furada. Me avise.
 -- ============================================================

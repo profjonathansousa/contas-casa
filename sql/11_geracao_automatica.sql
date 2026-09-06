@@ -67,6 +67,18 @@ create table if not exists public.mes_gerado (
 -- conta. Se o app pudesse desmarcar um mês, a durabilidade seria uma
 -- convenção do cliente; sem os dois verbos, é propriedade do banco. Um mês,
 -- uma vez nascido, não desnasce.
+--
+-- E o INSERT precisa de mais do que "é da minha casa". A tabela fica exposta
+-- em /rest/v1/mes_gerado como qualquer outra: com só o casa_id conferido,
+-- qualquer sessão logada poderia gravar à mão a marca de um mês FUTURO — e
+-- aquele mês nunca nasceria, porque garantir_mes() encontraria a marca e
+-- devolveria zero. Um POST de uma linha apagaria a geração automática de um
+-- mês inteiro, em silêncio. Também daria para forjar origem = 'backfill' e
+-- corromper o único registro que distingue "nasceu aqui" de "já era".
+--
+-- Por isso o with check exige as três coisas juntas. A competência sai da
+-- MESMA expressão que garantir_mes() usa, e não de um parâmetro: não existe
+-- valor que o cliente possa mandar para escolher outro mês.
 
 alter table public.mes_gerado enable row level security;
 alter table public.mes_gerado force  row level security;
@@ -76,8 +88,13 @@ drop policy if exists mes_gerado_criar on public.mes_gerado;
 
 create policy mes_gerado_ler   on public.mes_gerado for select to authenticated
   using (casa_id = public.minha_casa());
+
 create policy mes_gerado_criar on public.mes_gerado for insert to authenticated
-  with check (casa_id = public.minha_casa());
+  with check (
+        casa_id     = public.minha_casa()
+    and competencia = date_trunc('month', (now() at time zone 'America/Sao_Paulo'))::date
+    and origem      = 'automatico'
+  );
 
 revoke all on public.mes_gerado from anon;
 grant select, insert on public.mes_gerado to authenticated;
@@ -216,6 +233,17 @@ grant execute on function public.garantir_mes() to authenticated;
 -- Em 06/09/2026 o banco tinha duas competências, ambas 100% vindas de modelo:
 -- 2026-09 (20 lançamentos) e 2026-10 (14). Espera-se que este insert marque
 -- EXATAMENTE 2 linhas. O sql/11_prova_geracao.sql confere.
+--
+-- CONTEXTO DE ROLE, e por que isto NÃO depende da policy do cliente: esta
+-- migration roda no SQL Editor do Supabase, como "postgres", que tem
+-- rolbypassrls = true (conferido no catálogo em 06/09/2026; authenticated e
+-- anon têm false). RLS não se aplica, então o 'backfill' passa mesmo com a
+-- policy de INSERT exigindo origem = 'automatico' e o mês corrente.
+--
+-- E o backfill PRECISA desse contexto: o select lê public.lancamento de todas
+-- as casas, o que authenticated não enxerga. Rodar isto como authenticated não
+-- falharia em silêncio — a policy recusaria o insert com erro. Mas o lugar
+-- certo é o SQL Editor.
 
 insert into public.mes_gerado (casa_id, competencia, gerado_em, origem)
 select distinct l.casa_id, l.competencia, now(), 'backfill'

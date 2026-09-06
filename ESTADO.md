@@ -1384,6 +1384,16 @@ momentos diferentes.
   sem DELETE, de propósito: é isso que torna durável apagar uma conta. Se o app
   pudesse desmarcar um mês, a durabilidade seria convenção do cliente; sem os
   dois verbos, é propriedade do banco.
+- **E o INSERT exige três coisas juntas**, não só o `casa_id`. A tabela fica
+  exposta em `/rest/v1/mes_gerado` como qualquer outra: com só a casa conferida,
+  uma sessão logada poderia gravar à mão a marca de um mês **futuro** — e aquele
+  mês nunca nasceria, porque `garantir_mes()` acharia a marca e devolveria zero.
+  Um POST de uma linha apagaria a geração automática de um mês inteiro, em
+  silêncio. Também daria para forjar `origem = 'backfill'`. A policy passou a
+  exigir `casa_id = minha_casa()`, `competencia` igual ao mês corrente de São
+  Paulo **calculado no banco**, e `origem = 'automatico'`. A competência sai da
+  mesma expressão que a função usa, não de um parâmetro: não existe valor que o
+  cliente possa mandar para escolher outro mês.
 - **`lancamento_do_modelo_idx`**, índice único em
   `(casa_id, competencia, modelo_id)`. Não é parcial e não precisa ser:
   lançamento manual tem `modelo_id` nulo, e nulo não colide em índice único.
@@ -1456,6 +1466,15 @@ Antes do commit, na réplica local e como `authenticated`:
 - `authenticated` **não consegue apagar** de `mes_gerado`: `permission denied`.
   Foi descoberto por acidente, tentando limpar a réplica — e é a garantia da
   exclusão durável funcionando.
+- e, sob um usuário real da casa, as quatro marcas proibidas são recusadas com
+  **42501** — a policy, não uma check constraint: mês passado, mês futuro,
+  `origem = 'backfill'` e marca para outra casa. O caminho legítimo passa, e o
+  `garantir_mes()` continua rodando. Está na medição 8 da prova, e nada fica
+  gravado: cada tentativa roda numa subtransação desfeita de propósito.
+- o backfill depende do **role**, não da policy: rodado como `postgres`
+  (`rolbypassrls = true`, conferido no catálogo) ele grava as marcas
+  `'backfill'`; a mesma instrução rodada como `authenticated` apanha com
+  `new row violates row-level security policy`. Falha alta, não silenciosa.
 
 O `sql/11_prova_geracao.sql` também roda inteiro nessa réplica, sem erro, e o
 controle negativo da RLS devolve zero.
