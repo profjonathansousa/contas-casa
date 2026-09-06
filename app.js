@@ -45,6 +45,7 @@ var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
 var eu = null;        // { id, casa_id, nome }
 var nomes = {};       // id do perfil -> primeiro nome
 var comp = mesDeHoje();
+var mesGarantido = null;   // a competência que o BANCO disse ser a corrente
 var itens = [];
 var canal = null;
 var editando = false;
@@ -426,6 +427,26 @@ async function carregarMes() {
   itens = r.data;
   cacheGravar();
   desenhar();
+}
+
+// O mês corrente nasce uma vez, e quem decide qual é o mês corrente é o banco,
+// no fuso de São Paulo. O mesDeHoje() daqui usa o relógio do aparelho, que às
+// 21h de 30/09 num telefone em UTC já virou outubro.
+//
+// A correção mora na chave primária de mes_gerado, no banco: dois aparelhos
+// abrindo o app no mesmo segundo disputam ali, e só um gera. Isto aqui é só a
+// chamada. Se falhar — sem rede, sessão vencida —, o app segue com o que tem e
+// o botão "Trazer N contas fixas" continua sendo o caminho consciente. Nada de
+// aviso vermelho na abertura por causa de uma automação.
+async function garantirMesCorrente() {
+  try {
+    var g = await db.rpc('garantir_mes');
+    if (g.error || !g.data || !g.data[0]) return null;
+    mesGarantido = g.data[0].competencia;
+    return mesGarantido;
+  } catch (e) {
+    return null;   // sem rede: o mês segue como está, e o botão cobre
+  }
 }
 
 function ligarTempoReal() {
@@ -1234,6 +1255,11 @@ async function abrirApp() {
   comp = mesDeHoje();
   mostrarTela('mes');
   await carregarModelos();
+  // Garantir ANTES de carregar, e não depois: assim, quando dois aparelhos
+  // abrem juntos, o perdedor da disputa espera o vencedor gravar em vez de
+  // pintar um mês vazio.
+  var mesDoBanco = await garantirMesCorrente();
+  if (mesDoBanco) comp = mesDoBanco;
   await carregarMes();
   ligarTempoReal();
   pintarBotaoAvisos();
@@ -1254,9 +1280,17 @@ async function abrirApp() {
   }
 })();
 
-// Se o app ficou parado em segundo plano, recarrega ao voltar.
+// Se o app ficou parado em segundo plano, recarrega ao voltar. E se o mês virou
+// enquanto ele dormia, o mês novo precisa nascer: um PWA que fica semanas
+// aberto na tela de início nunca faz um abrirApp() novo.
+// Garantir aqui NÃO mexe em comp: quem estava olhando agosto continua em agosto.
 document.addEventListener('visibilitychange', function () {
-  if (!document.hidden && eu && !editando) carregarMes();
+  if (document.hidden || !eu || editando) return;
+  if (mesGarantido && mesDeHoje() !== mesGarantido) {
+    garantirMesCorrente().then(function () { carregarMes(); });
+  } else {
+    carregarMes();
+  }
 });
 
 if ('serviceWorker' in navigator) {

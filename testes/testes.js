@@ -25,6 +25,14 @@ medir('competencia pedida', LOG.selects[1].comp, MESHOJE);
 medir('tela de login escondida', q('#tela-login').hidden, true);
 medir('tela do mes visivel', q('#tela-mes').hidden, false);
 
+print('\n  -- o mes corrente nasce sozinho ao abrir --');
+medir('chamou garantir_mes', LOG.rpcs[0] && LOG.rpcs[0].nome, 'garantir_mes');
+print('  (sem argumento de proposito: e a assinatura que impede gerar mes historico)');
+medir('sem argumento', LOG.rpcs[0].args === undefined, true);
+print('  (ANTES de ler o mes: senao dois aparelhos juntos pintariam mes vazio)');
+medir('nenhum mes lido antes dela', LOG.rpcs[0].mesesLidosAntes, 0);
+medir('uma chamada so', LOG.rpcs.length, 1);
+
 print('\n== 2. totais do cabecalho ==');
 // previsto = 1800 + 95,40 + 129,90 = 2025,30 | pago = 129,90 | a pagar = 1895,40 | sem valor = 2
 medir('previsto', q('#t-previsto').innerHTML, '<i>R$</i> 2.025,30');
@@ -87,6 +95,7 @@ medir('contagem de em-aberto caiu de 2 para 1', q('#t-aberto')._txt, '1 conta em
 
 print('\n== 8. navegar entre meses ==');
 var antes4 = LOG.selects.length;
+var rpcAntes8 = LOG.rpcs.length;
 q('#mes-prox').disparar('click');
 esperar();
 var p = MESHOJE.split('-'); var prox = new Date(+p[0], +p[1], 1);
@@ -95,6 +104,20 @@ medir('mes seguinte pedido', LOG.selects[antes4].comp, esperadoProx);
 q('#mes-ant').disparar('click');
 esperar();
 medir('voltou para o mes corrente', LOG.selects[LOG.selects.length-1].comp, MESHOJE);
+
+print('\n  -- e agora um mes PASSADO --');
+var pAnt = MESHOJE.split('-'); var ant = new Date(+pAnt[0], +pAnt[1] - 2, 1);
+var esperadoAnt = ant.getFullYear() + '-' + String(ant.getMonth()+1).padStart(2,'0') + '-01';
+q('#mes-ant').disparar('click');
+esperar();
+medir('mes passado pedido', LOG.selects[LOG.selects.length-1].comp, esperadoAnt);
+q('#mes-prox').disparar('click');
+esperar();
+
+print('\n  -- CONTROLE NEGATIVO: navegar e LEITURA --');
+print('  (se um so desses passeios gerasse mes, voltar para janeiro reescreveria janeiro)');
+medir('nenhuma chamada ao banco para gerar', LOG.rpcs.length - rpcAntes8, 0);
+medir('e a tela voltou para o mes corrente', LOG.selects[LOG.selects.length-1].comp, MESHOJE);
 
 print('\n== 9. conta avulsa ==');
 q('#btn-add').disparar('click');
@@ -577,6 +600,70 @@ q('#btn-esqueci').disparar('click');
 esperar();
 medir('chamou a recuperacao', LOG.auth[authB].o_que, 'resetPasswordForEmail');
 medir('para o e-mail digitado', LOG.auth[authB].email, 'alguem@exemplo.com');
+
+print('\n== 19. quem manda no mes corrente e o banco ==');
+print('  (a trava de verdade e a chave primaria de mes_gerado, no Postgres: duas');
+print('   transacoes se resolvem la. A bancada mede o lado CLIENTE — quando');
+print('   chama, com o que, e o que faz com a resposta. Concorrencia de banco');
+print('   NAO se mede aqui, e este arquivo nao finge que mede.)');
+
+function garantidas() {
+  return LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; });
+}
+function mesNaTela() { return LOG.selects[LOG.selects.length - 1].comp; }
+function entrar() {
+  q('#in-email').value = 'alguem@exemplo.com';
+  q('#in-senha').value = 'x';
+  q('#form-login').disparar('submit');
+  esperar();
+}
+var p19 = MESHOJE.split('-');
+var d19 = new Date(+p19[0], +p19[1], 1);
+var MESPROX19 = d19.getFullYear() + '-' + String(d19.getMonth()+1).padStart(2,'0') + '-01';
+var a19 = new Date(+p19[0], +p19[1] - 2, 1);
+var MESANT19 = a19.getFullYear() + '-' + String(a19.getMonth()+1).padStart(2,'0') + '-01';
+
+print('\n  -- abrir de novo pergunta de novo: o cliente nao guarda a resposta --');
+print('  (o guard do cliente e economia; a correcao mora na chave do banco)');
+var g19 = garantidas().length;
+RESPOSTA_GARANTIR = { competencia: MESPROX19, criadas: 3 };
+entrar();
+medir('perguntou de novo', garantidas().length - g19, 1);
+print('  (o mesDeHoje() usa o relogio do APARELHO; quem decide e Sao Paulo, no banco)');
+medir('o mes carregado foi o do servidor', mesNaTela(), MESPROX19);
+
+print('\n  -- voltar do segundo plano com o mes no lugar --');
+RESPOSTA_GARANTIR = { competencia: MESHOJE, criadas: 0 };
+entrar();
+medir('abriu no mes corrente', mesNaTela(), MESHOJE);
+q('#mes-ant').disparar('click');           // a pessoa foi olhar um mes passado
+esperar();
+var g19b = garantidas().length;
+docHs.visibilitychange.forEach(function (f) { f(); });
+esperar();
+medir('nao perguntou nada (o mes nao virou)', garantidas().length - g19b, 0);
+medir('e continua no mes passado que ela abriu', mesNaTela(), MESANT19);
+
+print('\n  -- e quando o relogio do aparelho passa a discordar do banco --');
+print('  (e o que acontece a meia-noite do dia 1: um PWA que fica semanas aberto');
+print('   na tela de inicio nunca faz um abrirApp() novo, e o mes nao nasceria)');
+RESPOSTA_GARANTIR = { competencia: MESANT19, criadas: 0 };
+entrar();
+var g19c = garantidas().length;
+docHs.visibilitychange.forEach(function (f) { f(); });
+esperar();
+medir('perguntou', garantidas().length - g19c, 1);
+print('  (mas NAO arrasta a tela: quem estava olhando agosto continua em agosto)');
+medir('nao mexeu no mes que a pessoa via', mesNaTela(), MESANT19);
+
+print('\n  -- o botao manual continua inteiro --');
+print('  (automatico = o mes nasce uma vez; botao = traz o que falta, quantas quiser)');
+var rpc19 = LOG.rpcs.length;
+q('#btn-gerar').disparar('click');
+esperar();
+medir('continua chamando gerar_mes', LOG.rpcs[rpc19].nome, 'gerar_mes');
+medir('para o mes que esta na tela, nao para o corrente',
+      LOG.rpcs[rpc19].args.p_competencia, MESANT19);
 
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

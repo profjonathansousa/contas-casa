@@ -34,7 +34,9 @@ CONTAS_CASA/
 │   ├── 07_avisos.sql          memória de aviso enviado (um por dia e por slot)
 │   ├── 08_avisos_por_pessoa.sql  preferência de aviso por pessoa + véspera
 │   ├── 09_parcelas.sql        contas que acabam: 12 vezes a partir de tal mês
-│   └── 10_codigo_pagamento.sql  código de barras e PIX guardados no lançamento
+│   ├── 10_codigo_pagamento.sql  código de barras e PIX guardados no lançamento
+│   ├── 11_geracao_automatica.sql  mes_gerado + garantir_mes(): o mês nasce sozinho
+│   └── 11_prova_geracao.sql   prova do bloco 11 (trava, índice, RLS, backfill)
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -57,10 +59,23 @@ o caso da conta de mercado, cujo valor só se sabe depois.
 
 O botão "Transformar as contas do mês em fixas" cria as fixas de uma vez a
 partir do mês que está na tela. Depois é só desligar as que não se repetem.
-Num mês onde falta alguma fixa, a tela do mês mostra "Trazer N contas fixas".
+
+**O mês corrente nasce sozinho.** Ao abrir o app, o banco confere se aquela
+competência já foi inicializada nesta casa e, se não foi, traz as contas fixas
+— uma vez, e só do mês corrente, decidido pelo relógio de São Paulo no próprio
+banco. **Navegar entre meses é leitura**: voltar para janeiro não cria janeiro.
+
+**O botão continua.** Ele mudou de papel: automático é *o mês nasce*; o botão
+"Trazer N contas fixas" é *traga o que falta*, para a conta fixa cadastrada
+depois que o mês já nasceu. Aparece sozinho quando há o que trazer.
+
+**Apagar vale.** Uma conta apagada não volta ao reabrir o app, ao voltar do
+segundo plano nem ao navegar até o mês. Só volta se você tocar no botão — que é
+o pedido explícito de trazê-la de volta.
 
 Gerar o mês duas vezes não duplica nada: a comparação é por descrição, então
-conta já digitada na mão também não vem repetida.
+conta já digitada na mão também não vem repetida. E um modelo produz no máximo
+uma conta por mês, garantido por índice único no banco.
 
 **Conta que acaba.** Acordo parcelado, parcela de imposto, material escolar —
 o que vem doze vezes e para. Toque na linha "todo dia 8" de uma conta fixa e
@@ -124,7 +139,7 @@ iPhone, porque o app instalado não enxerga a sessão do Safari.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
 onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 154 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 170 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -135,6 +150,12 @@ separado do Web Push, sem tocar no banco e sem Secret nenhum.
 **perfil** — `id` (= `auth.uid()`), `casa_id`, `nome`,
 `avisa_vespera_20h`, `avisa_dia_12h`, `avisa_dia_20h` (preferências de aviso
 por pessoa, todas `default true`).
+
+**mes_gerado** — `casa_id`, `competencia`, `gerado_em`, `origem`
+(`'automatico'` ou `'backfill'`), chave primária `(casa_id, competencia)`. Uma
+linha quer dizer "esta competência desta casa já foi inicializada". É a trava
+que resolve dois aparelhos abrindo o app ao mesmo tempo, e é o que torna
+durável apagar uma conta. Sem UPDATE e sem DELETE, de propósito.
 
 **lancamento** — `id`, `casa_id`, `modelo_id` (nulo em conta digitada na mão;
 preenchido no que veio das contas fixas), `competencia` (date, sempre dia 1 do
@@ -181,8 +202,10 @@ cliente.
 
 ## Estado atual
 
-Os blocos **1 a 10** estão concluídos. A bancada fecha em
-`154 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+Os blocos **1 a 10** estão concluídos e no ar. O bloco **11** está
+implementado e medido, mas **ainda não no ar**: depende de aplicar
+`sql/11_geracao_automatica.sql` no banco antes do merge. A bancada fecha em
+`170 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
   recuperação de senha) estão implementados e no ar.
@@ -197,12 +220,12 @@ Os blocos **1 a 10** estão concluídos. A bancada fecha em
 Os próximos blocos são, nesta ordem:
 
 ```text
-11 → 13 → 14 → 12
+13 → 14 → 12
 ```
 
 | bloco | entrega | observação |
 |---|---|---|
-| **11** | geração automática do mês | reusa `gerar_mes()`; o botão manual deixa de ser necessário |
+| ~~**11**~~ | ~~geração automática do mês~~ | feito em 06/09; falta aplicar o `sql/11` e mesclar |
 | **13** | histórico | listar meses, previsto, pago, a pagar e número de contas |
 | **14** | receitas | nova tabela `receita`, separada de `lancamento` |
 | **12** | gráficos | só depois de histórico e receitas estabilizados |

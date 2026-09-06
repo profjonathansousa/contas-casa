@@ -1,14 +1,17 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 06/09/2026 — documentação alinhada ao código e auditoria do
-roadmap 11 → 13 → 14 → 12. NO AR.
+Atualizado em 06/09/2026 — bloco 11 (geração automática do mês) implementado.
+NO AR até o bloco 10; o bloco 11 espera o `sql/11` no banco e o merge.
 
 ## ESTADO ATUAL
 
 ### O que está de pé
 
 - Blocos **1 a 10** concluídos e no ar.
-- Bancada verde em **154 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bloco **11** (o mês corrente nasce sozinho ao abrir o app) implementado e
+  medido, **ainda não no ar**: depende de aplicar `sql/11_geracao_automatica.sql`
+  no banco **antes** do merge, porque o app passa a chamar `garantir_mes()`.
+- Bancada verde em **170 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.
@@ -46,7 +49,8 @@ A terceira coluna é a que quase sempre falta.
 | **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
 | **contas que acabam (parcelas)** | sim (bloco 9) | sim | **sim — confirmado por Jonathan em 05/09; 3 contas fixas já parceladas no banco** |
 | **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — no ar, mas nenhum código colado ainda** |
-| **trocar e recuperar a senha** | sim (bloco 10) | sim (154/4/27/49 inclui os controles) | **não — ainda não exercitado num aparelho depois do bloco 10** |
+| **o mês corrente nasce sozinho** | sim (bloco 11) | sim (bancada 170/4/27/49 com dois controles negativos + o `sql/11` exercitado numa réplica local, inclusive a concorrência com duas sessões) | **não — o `sql/11` ainda não foi aplicado no banco de produção** |
+| **trocar e recuperar a senha** | sim (bloco 10) | sim (os controles estão no placar atual) | **não — ainda não exercitado num aparelho depois do bloco 10** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
 ### Validações manuais ainda pendentes
@@ -65,21 +69,24 @@ pendência, mas deve ser revalidado em qualquer mudança futura que toque no
 Nada abaixo está implementado. São decisões de desenho e pontos a auditar
 antes de abrir os blocos 11–14.
 
-**Bloco 11 — geração automática do mês**
+**Bloco 11 — geração automática do mês — IMPLEMENTADO**
 
-- Reaproveitar `gerar_mes()`; a chamada passa a acontecer ao abrir o mês e ao
-  navegar entre meses, não por botão.
-- **Ainda não implementado.** O desenho planejado é:
-  abrir/carregar mês → verificar geração → `gerar_mes()` → respeitar `ativo`,
-  parcelas, PIX estático e idempotência → atualizar a tela.
-- **Questões arquiteturais a auditar antes de implementar:**
-  - concorrência entre dois aparelhos;
-  - suficiência da idempotência atual (hoje `NOT EXISTS` por descrição);
-  - eventual necessidade de constraint única e de `ON CONFLICT`;
-  - comportamento com mês parcialmente preenchido;
-  - garantir que lançamentos existentes não sejam alterados;
-  - momento correto da chamada;
-  - eventual remoção do botão “Trazer N contas fixas”.
+As sete questões levantadas aqui foram respondidas antes de qualquer linha de
+código, e a seção **Bloco 11** no fim deste arquivo registra o desenho e o
+porquê de cada resposta. Em resumo:
+
+- **Concorrência**: a chave primária de `mes_gerado (casa_id, competencia)`.
+- **Idempotência**: em três camadas — o `NOT EXISTS` por descrição, o índice
+  único `(casa_id, competencia, modelo_id)` e a marca do mês.
+- **Constraint e `ON CONFLICT`**: sim aos dois, com **alvo nomeado**, e a
+  constraint é invariante de integridade, não a trava da automação.
+- **Mês parcialmente preenchido**: `gerar_mes()` traz só o que falta, como
+  sempre trouxe; nada muda aí.
+- **Lançamentos existentes**: nunca tocados — a função só faz INSERT.
+- **Momento da chamada**: ao abrir o app, e ao voltar do segundo plano se o mês
+  virou. **Nunca ao navegar entre meses**: navegar é leitura.
+- **Remoção do botão**: **não**. Ele passa a ter outro papel — trazer a conta
+  fixa cadastrada depois que o mês já nasceu.
 
 **Bloco 13 — histórico**
 
@@ -147,12 +154,12 @@ antes de abrir os blocos 11–14.
 ## ROADMAP
 
 ```text
-11 → 13 → 14 → 12
+13 → 14 → 12          (o 11 saiu da fila: implementado em 06/09)
 ```
 
 | bloco | entrega |
 |---|---|
-| **11** | geração automática do mês, reaproveitando `gerar_mes()` |
+| ~~**11**~~ | ~~geração automática do mês~~ — feito, aguardando `sql/11` e merge |
 | **13** | histórico: meses, previsto, pago, a pagar, número de contas |
 | **14** | receitas em tabela separada `receita` |
 | **12** | gráficos, só depois que histórico e receitas estiverem estáveis |
@@ -163,15 +170,18 @@ sobre agregações que depois mudam.
 
 ## PRÓXIMO PASSO
 
-1. **Não implementar os blocos 11–14 ainda.** Primeiro fechar esta auditoria
-   documental; depois auditar a arquitetura dos próximos blocos.
+1. **Aplicar `sql/11_geracao_automatica.sql` no banco e depois `sql/11_prova_geracao.sql`**,
+   conferindo as sete medições da prova — em especial que o backfill marcou
+   **exatamente 2** competências. Só então o merge: o app já chama
+   `garantir_mes()`, e sem a função no banco a abertura perde a geração
+   automática (o botão continua funcionando).
 2. **Colar o primeiro código de pagamento** e conferir que o valor vem
    sozinho — pendência do bloco 8.
 3. **A segunda pessoa da casa entra no app** e liga os avisos no aparelho
    dela — pré-requisito humano dos avisos por pessoa.
 4. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
    ou no mecanismo de `postgres_changes`.
-5. Depois dessas pendências humanas, seguir o roadmap **11 → 13 → 14 → 12**,
+5. Depois dessas pendências humanas, seguir o roadmap **13 → 14 → 12**,
    em blocos pequenos, com auditoria antes e depois e com a bancada verde.
 
 ## HISTÓRICO TÉCNICO
@@ -1317,3 +1327,179 @@ tivesse sido só mudar o minuto do cron, o aviso de hoje teria se perdido.
 
 `pessoas: 2` é o laço por pessoa do bloco 7 rodando em produção pela primeira
 vez, lendo as colunas novas do perfil sem erro.
+
+## Bloco 11 — o mês nasce sozinho (06/09/2026)
+
+Uma frase: ao abrir o app, o mês corrente nasce uma vez — e nasce no banco,
+não no JavaScript.
+
+O buraco que fecha: até aqui o mês só existia depois que alguém tocava "Trazer
+N contas fixas". Se ninguém tocasse, o robô dos avisos não tinha o que avisar,
+e a conta vencia em silêncio.
+
+### A primeira tentativa, e por que foi descartada
+
+Houve uma implementação anterior (commit local `86c81c5`, nunca publicado) que
+foi auditada e recusada **antes** de qualquer SQL entrar no banco. Ela errava
+em quatro pontos, e os quatro viraram requisito do desenho definitivo:
+
+1. **Gerava mês ao navegar.** A chamada entrava também no `irPara()`, então
+   voltar para janeiro *criava* janeiro a partir dos modelos de hoje. Uma
+   passada distraída seis meses para trás fabricaria seis meses de história
+   inventada. Ler não pode escrever.
+2. **Ressuscitava conta apagada.** Sem marca de "este mês já nasceu", apagar
+   uma conta virava escolha temporária: ela voltava na próxima abertura.
+3. **Punha a trava no lugar errado.** A constraint proposta era
+   `(casa_id, competencia, lower(btrim(descricao)))`. Como `modelo` não tem
+   unicidade por descrição, duas contas fixas chamadas "Internet" na mesma casa
+   teriam virado uma só — em silêncio, por causa do `ON CONFLICT DO NOTHING`.
+4. **Removia o botão.** Sem ele, uma conta fixa cadastrada no dia 12 não teria
+   como entrar no mês que já nasceu.
+
+### As três separações que mandam no desenho
+
+**Nascer ≠ trazer o que falta.** Nascer é automático, acontece uma vez por mês
+e é o que o bloco 11 criou. Trazer o que falta continua sendo o botão,
+explícito, quantas vezes a pessoa quiser. Sem essa separação, o item 4 acima
+não tem conserto.
+
+**A trava é o MÊS, não a linha.** O que precisa ser idempotente é "este mês já
+nasceu nesta casa". Por isso a trava é a chave primária de `mes_gerado`, e não
+uma constraint na `lancamento`.
+
+**Quem decide se gera ≠ quem decide se é a mesma linha.** A primeira é o
+`NOT EXISTS` por descrição, que continua inteiro e é o que impede duplicar uma
+conta digitada à mão. A segunda é o índice único por `modelo_id`, que só
+arbitra entre linhas que a função já decidiu inserir — todas com `modelo_id`.
+A auditoria anterior temia que trocar a chave para `modelo_id` quebrasse a
+regra da conta manual: não quebra, porque são perguntas diferentes, feitas em
+momentos diferentes.
+
+### O que entrou
+
+- **`public.mes_gerado (casa_id, competencia, gerado_em, origem)`**, PK
+  `(casa_id, competencia)`. Uma linha quer dizer "esta competência desta casa
+  já foi inicializada". `origem` distingue `'automatico'` de `'backfill'`.
+- **RLS com `force`, e só SELECT e INSERT** para `authenticated`. Sem UPDATE e
+  sem DELETE, de propósito: é isso que torna durável apagar uma conta. Se o app
+  pudesse desmarcar um mês, a durabilidade seria convenção do cliente; sem os
+  dois verbos, é propriedade do banco.
+- **`lancamento_do_modelo_idx`**, índice único em
+  `(casa_id, competencia, modelo_id)`. Não é parcial e não precisa ser:
+  lançamento manual tem `modelo_id` nulo, e nulo não colide em índice único.
+  De quebra fecha um defeito antigo — renomear uma conta fixa com o mês já
+  gerado fazia o `NOT EXISTS` deixar de casar, e a mesma conta entrava duas
+  vezes.
+- **`gerar_mes(date)`**: regra de negócio **idêntica** à do `sql/10`. Uma única
+  linha nova, de mecanismo: `on conflict (casa_id, competencia, modelo_id) do
+  nothing`, com alvo nomeado. Ela é necessária porque o botão chama a função
+  sem passar pela trava do `mes_gerado`.
+- **`garantir_mes()`**, sem argumento. É a assinatura que garante que navegar
+  para um mês histórico nunca vira escrita: não existe pedido que o cliente
+  possa formular. O mês vem de `date_trunc('month', now() at time zone
+  'America/Sao_Paulo')`, no banco — o `mesDeHoje()` do app usa o relógio do
+  aparelho, que às 21h de 30/09 num telefone em UTC já virou outubro. É a mesma
+  lição do bloco 6.
+- **Na tela**: `garantirMesCorrente()` roda **antes** do `carregarMes()`, e o
+  app adota a competência que o servidor devolveu. O `irPara()` não mudou uma
+  linha. O `visibilitychange` passou a perguntar de novo quando o relógio do
+  aparelho discorda do que o banco confirmou — sem mexer no mês que a pessoa
+  está vendo, porque um PWA que fica semanas aberto na tela de início nunca faz
+  um `abrirApp()` novo.
+
+### Concorrência: medida numa réplica local, não em produção
+
+Dois aparelhos chamam `garantir_mes()` no mesmo segundo. Um insere a marca; o
+outro **bloqueia** na chave primária até a transação do primeiro terminar, e só
+então recebe o conflito. Como o PostgREST roda a função inteira numa transação,
+a marca e os lançamentos do vencedor commitam juntos — então `criadas = 0` quer
+dizer literalmente "as contas já estão gravadas", nunca "estão a caminho". É
+por isso que a chamada vem **antes** da leitura do mês: assim o perdedor espera
+o vencedor gravar em vez de pintar um mês vazio.
+
+A bancada **não** mede isso: ela finge o banco inteiro. Mas o `sql/11` foi
+exercitado antes do commit numa **réplica local em PostgreSQL 16** — schema
+mínimo com `casa`, `perfil`, `modelo`, `lancamento`, `minha_casa()` e
+`parcela_no_mes()`, RLS ligada e forçada, rodando como `authenticated`. Com
+**duas sessões `psql` de verdade**:
+
+| medição | resultado |
+|---|---|
+| A abre transação e chama `garantir_mes()` | gerou 5 contas, sem commitar |
+| B chama ao mesmo tempo, com `statement_timeout = 2s` | **bloqueou** e estourou o timeout — `while inserting index tuple in relation "mes_gerado"`, dentro do `on conflict` |
+| A commita, B chama de novo | `criadas = 0`, e B enxerga as 5 contas de A |
+| estado final | 5 lançamentos, **1 marca** |
+
+B não recebeu zero cedo demais: ele esperou. É exatamente a propriedade que
+impede o mês pela metade, e agora é medida, não só argumentada.
+
+**O que continua não medido:** o mesmo comportamento no banco de produção
+(PostgreSQL 17, via PostgREST) e com dois aparelhos de verdade. A réplica prova
+o mecanismo; não prova a produção.
+
+### O resto do bloco, exercitado na mesma réplica
+
+Antes do commit, na réplica local e como `authenticated`:
+
+- o mês nasce com 4 contas e **os dois modelos chamados "Internet" entram os
+  dois** — é o caso que a chave por descrição teria comido em silêncio;
+- modelo desligado não entra; parcelada fora da janela não entra; parcelada
+  dentro vem com `9/12`; PIX estático vem copiado com `codigo_tipo = 'pix'`;
+- chamar `garantir_mes()` de novo devolve `criadas = 0`;
+- **apagar o Aluguel e chamar de novo: ele NÃO volta** — a exclusão é durável;
+- o botão (`gerar_mes`) traz o Aluguel de volta, e apertar duas vezes traz zero;
+- uma conta "Mercado" digitada à mão não é duplicada por um modelo `"mercado "`
+  — maiúscula e espaço sobrando incluídos: o `NOT EXISTS` por descrição segue
+  inteiro;
+- tentar gravar uma segunda linha do mesmo modelo no mesmo mês é **recusada**
+  pelo índice único, mesmo com descrição diferente;
+- `authenticated` **não consegue apagar** de `mes_gerado`: `permission denied`.
+  Foi descoberto por acidente, tentando limpar a réplica — e é a garantia da
+  exclusão durável funcionando.
+
+O `sql/11_prova_geracao.sql` também roda inteiro nessa réplica, sem erro, e o
+controle negativo da RLS devolve zero.
+
+### O backfill, e a marca que não pode mentir
+
+O banco já tinha duas competências. Sem backfill, o primeiro app aberto depois
+da migration marcaria o mês corrente como novo e rodaria a geração nele.
+
+A regra é seletiva: só marca competência onde a geração **demonstravelmente já
+rodou**, isto é, onde existe lançamento com `modelo_id` não nulo. Um mês que
+tenha apenas conta digitada à mão não é marcado — e é exatamente o mês em que a
+primeira geração automática ainda deve acontecer. Em 06/09/2026 essa cláusula
+não exclui nada (as duas competências são 100% vindas de modelo: 2026-09 com 20
+lançamentos e 2026-10 com 14, nenhum manual em todo o banco); a razão de ela
+existir é o mês em que vai excluir. A prova confere que marcou **exatamente 2**.
+
+### O que a bancada mede
+
+170 medidas no bloco do `app.js`, 16 delas novas. Ela mede o **lado cliente**:
+quando chama, com o quê, e o que faz com a resposta.
+
+- `garantir_mes` é chamada na abertura, **sem argumento**, e **antes** de
+  qualquer leitura de mês (o `mesesLidosAntes` do log prova a ordem).
+- **Controle negativo**: navegar para frente e para trás não faz nenhuma
+  chamada de geração. Com a chamada reposta dentro do `irPara()` — o defeito do
+  `86c81c5` — a bancada acusa 4 chamadas e fica vermelha.
+- A competência devolvida pelo servidor vence o palpite do aparelho.
+- Voltar do segundo plano com o mês no lugar não pergunta nada; com o relógio
+  discordando, pergunta — e em nenhum dos dois casos arrasta a tela para outro
+  mês.
+- O botão continua existindo e continua chamando `gerar_mes` para o mês que
+  está na tela, não para o corrente.
+
+### O que fica pendente
+
+- **Aplicar `sql/11_geracao_automatica.sql` no banco e rodar
+  `sql/11_prova_geracao.sql`** antes do merge. O app já chama `garantir_mes()`.
+- **Anotar na prova o md5 do `gerar_mes()` instalado** depois de aplicar. O
+  anterior, do `sql/10`, era `0619f9ab536a4d80c0a1c7ea32a3e3cc`. É o detector
+  de divergência entre o arquivo SQL e a função realmente instalada, que até
+  aqui não existia.
+- **Limite conhecido, não resolvido aqui:** o mês só nasce quando alguém abre o
+  app. Se ninguém abrir no dia 1º, o robô dos avisos não terá o que avisar
+  naquele dia. Isso já era verdade com o botão, então não é regressão — mas é o
+  argumento para, um dia, o robô também garantir o mês. **Fora do escopo do
+  bloco 11.**

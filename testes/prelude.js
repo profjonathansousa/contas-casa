@@ -29,10 +29,15 @@ Object.defineProperty(Elem.prototype, 'innerHTML', {
 });
 
 var registro = {};
+// Os ouvintes do document ficam guardados: sem isso o 'visibilitychange' —
+// que e como o app percebe que o mes virou enquanto ele dormia — nao teria
+// como ser disparado por uma medida.
+var docHs = {};
 var document = {
   querySelector: function (s) { return registro[s] || (registro[s] = new Elem('div')); },
   createElement: function (t) { return new Elem(t); },
-  addEventListener: function () {}, hidden: false
+  addEventListener: function (n, f) { (docHs[n] = docHs[n] || []).push(f); },
+  hidden: false
 };
 // appendChild precisa marcar o pai (para replaceWith funcionar)
 var _ap = Elem.prototype.appendChild;
@@ -69,6 +74,11 @@ function avancarTempo(ms) {
 
 /* ----- dados fixos da bancada (ficticios) ----- */
 var MES = (function () { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01'; })();
+// O que o garantir_mes() do banco devolve. Fica solto de propósito: um teste
+// muda isto para provar que a competência do SERVIDOR vence o palpite do
+// aparelho.
+var RESPOSTA_GARANTIR = { competencia: MES, criadas: 0 };
+
 var ID_EU = 'aaaaaaaa-0000-0000-0000-000000000001';
 var ID_OUTRO = 'bbbbbbbb-0000-0000-0000-000000000002';
 var CASA = 'cccccccc-0000-0000-0000-000000000003';
@@ -159,8 +169,20 @@ var supabase = {
       },
       removeChannel: function () {},
       rpc: function (nome, args) {
-        LOG.rpcs.push({ nome: nome, args: args });
+        // mesesLidosAntes prova ORDEM: quantos selects de lancamento já tinham
+        // acontecido quando esta chamada foi feita. É como a bancada mede que a
+        // geração vem ANTES da leitura do mês, e não depois.
+        LOG.rpcs.push({
+          nome: nome, args: args,
+          mesesLidosAntes: LOG.selects.filter(function (x) {
+            return x.tabela === 'lancamento';
+          }).length
+        });
         return thenable(function () {
+          if (nome === 'garantir_mes') {
+            return { data: [{ competencia: RESPOSTA_GARANTIR.competencia,
+                              criadas:     RESPOSTA_GARANTIR.criadas }], error: null };
+          }
           if (nome === 'gerar_mes') return { data: 1, error: null };
           return { data: MODELOS.length, error: null };
         });
