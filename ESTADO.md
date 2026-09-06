@@ -1045,6 +1045,53 @@ Detalhe que ajuda e já está certo no código: os campos de login têm
 oferece guardar a senha no próximo login. **Guardar ali resolve o problema
 prático das duas pessoas.**
 
+## Bloco 10 — senha: trocar, e esquecer (05/09/2026)
+
+Nasceu de um aperto real, à noite, com a esposa do Jonathan do lado.
+
+### A parede que ninguém tinha visto
+
+O link de recuperação funcionou: ela entrou pelo Safari do iPhone. Aí adicionou
+o app à tela de início e **caiu na tela de login**.
+
+Não é defeito do app. **No iPhone, o Safari e o app da tela de início têm
+armazenamentos separados.** A sessão vive no `localStorage`, e o `localStorage`
+de um não é o do outro. Não existe como copiar a sessão de lá para cá: **só a
+senha atravessa essa parede.**
+
+Isso torna a troca de senha dentro do app não um luxo, mas o único caminho para
+quem entrou por link.
+
+### E a pergunta que veio junto
+
+"Onde fica a senha dela no Supabase?" Em lugar nenhum. O que existe é
+`auth.users.encrypted_password`, um **hash bcrypt** (`$2a$`, 60 caracteres),
+que é matemática de mão única — ninguém com acesso total ao banco volta dele
+para a senha. Não há tela, tabela nem log com a senha em texto, e se houvesse
+seria falha grave do Supabase. Fica registrado porque a pergunta é natural e a
+resposta não é óbvia.
+
+### O que entrou
+
+- **"trocar senha"** no rodapé, para quem está dentro. Duas caixas, confere se
+  batem e se tem 6 caracteres, e chama `updateUser`.
+- **"Esqueci a senha"** na tela de login, com `redirectTo` apontando para o
+  próprio app — sem isso o link cai no Site URL do projeto, que foi o que
+  mandou todo mundo para um `localhost:3000` a tarde inteira.
+- Quem chega por link de recuperação **já encontra a folha da senha aberta**. A
+  leitura do endereço acontece antes de perguntar pela sessão, porque o
+  `supabase-js` consome o token e limpa o hash.
+- A folha explica, na hora, por que a senha importa: o app instalado não
+  enxerga a sessão do Safari, e o Chaveiro do iPhone deve guardar.
+
+Bancada: **154 / 4 / 24 / 49**, 0 falhas. Quatro medidas de controle negativo:
+senhas diferentes não passam, senha curta não passa, "esqueci" sem e-mail não
+chama nada, e trocar senha não encosta em conta nenhuma.
+
+De quebra, uma medida minha reaproveitou um contador de um bloco anterior e
+falhou por baseline velho — o mesmo tipo de fragilidade que o contador de
+filhos tinha. Corrigida na hora.
+
 ## VALIDAÇÕES MANUAIS PENDENTES
 
 Nenhuma delas pode ser feita por código; todas precisam de aparelho, de gente

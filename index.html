@@ -26,6 +26,7 @@
     <label for="in-senha">Senha</label>
     <input id="in-senha" type="password" autocomplete="current-password" required>
     <button id="btn-entrar" type="submit">Entrar</button>
+    <button id="btn-esqueci" type="button" class="esqueci">Esqueci a senha</button>
     <p id="erro-login" class="erro" hidden></p>
   </form>
 </section>
@@ -58,6 +59,7 @@
     </div>
     <div class="links">
       <button id="btn-fixas" class="sair">contas fixas</button>
+      <button id="btn-senha" class="sair">trocar senha</button>
       <button id="btn-sair" class="sair">sair</button>
     </div>
   </footer>
@@ -163,6 +165,26 @@
     <button type="submit" id="cd-salvar">Guardar</button>
   </div>
   <p id="erro-codigo" class="erro" hidden></p>
+</form>
+
+<!-- ---------- senha ---------- -->
+<div id="fundo-senha" class="fundo" hidden></div>
+<form id="folha-senha" class="folha" hidden>
+  <h2 id="sn-titulo">Trocar a senha</h2>
+  <p class="ap-nota">Quando o iPhone oferecer guardar no Chaveiro, aceite. É o
+    que evita ficar sem acesso — e o app instalado na tela de início pede a
+    senha de novo, porque ele não enxerga a sessão do Safari.</p>
+  <label for="sn-nova">Senha nova</label>
+  <input id="sn-nova" type="password" autocomplete="new-password"
+         autocapitalize="off" autocorrect="off" required>
+  <label for="sn-repete">Repita</label>
+  <input id="sn-repete" type="password" autocomplete="new-password"
+         autocapitalize="off" autocorrect="off" required>
+  <div class="botoes">
+    <button type="button" id="sn-cancelar" class="secundario">Cancelar</button>
+    <button type="submit" id="sn-salvar">Salvar</button>
+  </div>
+  <p id="erro-senha" class="erro" hidden></p>
 </form>
 
 <div id="aviso" class="aviso" hidden></div>

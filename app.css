@@ -153,6 +153,11 @@ button { border: 0; background: none; cursor: pointer; }
 }
 .codigo.vazio { color: var(--fraco); font-weight: 400; }
 .codigo:active { opacity: .6; }
+.esqueci {
+  display: block; margin: 10px auto 0; background: none; border: 0;
+  font-size: 14px; color: var(--fraco); text-decoration: underline;
+}
+.esqueci:active { opacity: .6; }
 .cd-leitura { margin: 8px 2px 0; font-size: 14px; line-height: 1.35; }
 .cd-leitura.bom  { color: var(--pago); }
 .cd-leitura.ruim { color: var(--alerta); }

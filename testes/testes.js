@@ -525,5 +525,58 @@ medir('mandou nulo nos dois',
       [null, null]);
 medir('o chip volta a convidar', chipDe(itemPorDesc('Luz'))._txt, '+ código');
 
+print('\n== 17. trocar a senha ==');
+print('  (no iPhone o Safari e o app da tela de inicio tem armazenamentos');
+print('   separados: so a senha atravessa essa parede)');
+var lancAntesSenha = LOG.updates.filter(function (u) { return u.tabela === 'lancamento'; }).length;
+q('#btn-senha').disparar('click');
+medir('abriu a folha', q('#folha-senha').hidden, false);
+medir('titulo', q('#sn-titulo')._txt, 'Trocar a senha');
+
+print('\n  -- CONTROLE NEGATIVO --');
+var authA = LOG.auth.length;
+q('#sn-nova').value = 'abc123';
+q('#sn-repete').value = 'abc124';
+q('#folha-senha').disparar('submit');
+esperar();
+medir('duas diferentes nao passam', LOG.auth.length - authA, 0);
+medir('e diz por que', q('#erro-senha')._txt, 'As duas não são iguais.');
+
+q('#sn-nova').value = 'abc';
+q('#sn-repete').value = 'abc';
+q('#folha-senha').disparar('submit');
+esperar();
+medir('curta demais nao passa', LOG.auth.length - authA, 0);
+medir('e diz o tamanho', q('#erro-senha')._txt,
+      'A senha precisa de pelo menos 6 caracteres.');
+
+print('\n  -- senha boa --');
+q('#sn-nova').value = 'segredo-de-mentira';
+q('#sn-repete').value = 'segredo-de-mentira';
+q('#folha-senha').disparar('submit');
+esperar();
+medir('chamou o updateUser', LOG.auth[authA].o_que, 'updateUser');
+medir('com a senha digitada', LOG.auth[authA].campos, { password: 'segredo-de-mentira' });
+medir('folha fechou', q('#folha-senha').hidden, true);
+print('  (trocar senha nao pode encostar em conta nenhuma)');
+medir('nenhum lancamento tocado',
+      LOG.updates.filter(function (u) { return u.tabela === 'lancamento'; }).length, lancAntesSenha);
+
+print('\n== 18. esqueci a senha ==');
+var authB = LOG.auth.length;
+q('#in-email').value = '';
+q('#btn-esqueci').disparar('click');
+esperar();
+print('  -- CONTROLE: sem e-mail nao da para mandar link nenhum --');
+medir('nao chamou nada', LOG.auth.length - authB, 0);
+medir('pediu o e-mail', q('#erro-login')._txt,
+      'Escreva o e-mail primeiro, e eu mando o link.');
+
+q('#in-email').value = 'alguem@exemplo.com';
+q('#btn-esqueci').disparar('click');
+esperar();
+medir('chamou a recuperacao', LOG.auth[authB].o_que, 'resetPasswordForEmail');
+medir('para o e-mail digitado', LOG.auth[authB].email, 'alguem@exemplo.com');
+
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

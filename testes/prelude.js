@@ -1,6 +1,6 @@
 /* Bancada: DOM e Supabase falsos. Nada da logica do app e reimplementado --
    o app.js real roda em cima disto. */
-var LOG = { selects: [], updates: [], inserts: [], deletes: [], rpcs: [], canais: [] };
+var LOG = { selects: [], updates: [], inserts: [], deletes: [], rpcs: [], canais: [], auth: [] };
 
 function Elem(tag) {
   this.tag = tag; this.filhos = []; this.hs = {}; this._txt = ''; this._html = '';
@@ -142,6 +142,14 @@ var supabase = {
         getSession: function () { return Promise.resolve({ data: { session: { u: 1 } } }); },
         getUser: function () { return Promise.resolve({ data: { user: { id: ID_EU } } }); },
         signInWithPassword: function () { return Promise.resolve({ error: null }); },
+        updateUser: function (campos) {
+          LOG.auth.push({ o_que: 'updateUser', campos: campos });
+          return Promise.resolve({ error: null });
+        },
+        resetPasswordForEmail: function (email, opcoes) {
+          LOG.auth.push({ o_que: 'resetPasswordForEmail', email: email, opcoes: opcoes });
+          return Promise.resolve({ error: null });
+        },
         signOut: function () { return Promise.resolve({}); }
       },
       channel: function (nome) {

@@ -31,7 +31,11 @@ var el = {
   pcCancelar: $('#pc-cancelar'), erroParcelas: $('#erro-parcelas'),
   fundoCodigo: $('#fundo-codigo'), folhaCodigo: $('#folha-codigo'),
   cdDesc: $('#cd-desc'), cdTexto: $('#cd-texto'), cdLeitura: $('#cd-leitura'),
-  cdTirar: $('#cd-tirar'), erroCodigo: $('#erro-codigo')
+  cdTirar: $('#cd-tirar'), erroCodigo: $('#erro-codigo'),
+  btnEsqueci: $('#btn-esqueci'), btnSenha: $('#btn-senha'),
+  fundoSenha: $('#fundo-senha'), folhaSenha: $('#folha-senha'),
+  snTitulo: $('#sn-titulo'), snNova: $('#sn-nova'), snRepete: $('#sn-repete'),
+  snCancelar: $('#sn-cancelar'), erroSenha: $('#erro-senha')
 };
 
 var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
@@ -342,6 +346,61 @@ el.btnSair.addEventListener('click', async function () {
   await db.auth.signOut();
   eu = null; itens = []; modelos = []; comp = mesDeHoje();
   el.mes.hidden = true; el.fixas.hidden = true; el.login.hidden = false;
+});
+
+/* ---------- senha ----------
+
+   Por que isto existe, e por que não é luxo: no iPhone, o Safari e o app
+   adicionado à tela de início têm armazenamentos SEPARADOS. A sessão que vale
+   num não vale no outro. Quem entrou por link de recuperação no Safari
+   continua sem conseguir abrir o app instalado — só a senha atravessa essa
+   parede. */
+
+function abrirSenha(titulo) {
+  el.snTitulo.textContent = titulo || 'Trocar a senha';
+  el.snNova.value = '';
+  el.snRepete.value = '';
+  el.erroSenha.hidden = true;
+  el.fundoSenha.hidden = false;
+  el.folhaSenha.hidden = false;
+}
+function fecharSenha() {
+  el.fundoSenha.hidden = true;
+  el.folhaSenha.hidden = true;
+}
+el.snCancelar.addEventListener('click', fecharSenha);
+el.fundoSenha.addEventListener('click', fecharSenha);
+el.btnSenha.addEventListener('click', function () { abrirSenha('Trocar a senha'); });
+
+el.folhaSenha.addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  function erro(txt) { el.erroSenha.textContent = txt; el.erroSenha.hidden = false; }
+  el.erroSenha.hidden = true;
+
+  var nova = String(el.snNova.value);
+  if (nova.length < 6) { erro('A senha precisa de pelo menos 6 caracteres.'); return; }
+  if (nova !== String(el.snRepete.value)) { erro('As duas não são iguais.'); return; }
+
+  var r = await db.auth.updateUser({ password: nova });
+  if (r.error) { erro(r.error.message); return; }
+  fecharSenha();
+  aviso('Senha trocada. Agora dá para entrar pelo ícone da tela de início.');
+});
+
+el.btnEsqueci.addEventListener('click', async function () {
+  var email = el.email.value.trim();
+  el.erroLogin.hidden = true;
+  if (!email) {
+    el.erroLogin.textContent = 'Escreva o e-mail primeiro, e eu mando o link.';
+    el.erroLogin.hidden = false;
+    return;
+  }
+  // redirectTo aponta para o próprio app: sem isso o link cai no Site URL do
+  // projeto, que já mandou todo mundo para um localhost que não existe.
+  var volta = (window.location && window.location.href) || undefined;
+  var r = await db.auth.resetPasswordForEmail(email, volta ? { redirectTo: volta } : undefined);
+  if (r && r.error) { el.erroLogin.textContent = r.error.message; el.erroLogin.hidden = false; return; }
+  aviso('Se esse e-mail tiver conta, o link chega em instantes.');
 });
 
 /* ---------- carregar ---------- */
@@ -1181,9 +1240,18 @@ async function abrirApp() {
 }
 
 (async function iniciar() {
+  // O supabase-js consome o token do endereço e limpa o hash; por isso a
+  // leitura tem que ser feita ANTES de perguntar pela sessão.
+  var veioDeRecuperacao =
+    ((window.location && window.location.hash) || '').indexOf('type=recovery') >= 0;
+
   var s = await db.auth.getSession();
-  if (s.data.session) await abrirApp();
-  else el.login.hidden = false;
+  if (s.data.session) {
+    await abrirApp();
+    if (veioDeRecuperacao) abrirSenha('Defina uma senha');
+  } else {
+    el.login.hidden = false;
+  }
 })();
 
 // Se o app ficou parado em segundo plano, recarrega ao voltar.
