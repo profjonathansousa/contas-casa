@@ -21,7 +21,7 @@ carro sem apertar os olhos, funcionar com o polegar de uma mão só.
 ```
 CONTAS_CASA/
 ├── README.md                  este arquivo
-├── ESTADO.md                  onde o trabalho parou e qual é a próxima ação
+├── ESTADO.md                  estado atual, histórico, roadmap e próximo passo
 ├── .gitignore
 ├── .nojekyll                  desliga o Jekyll no GitHub Pages
 ├── sql/
@@ -44,9 +44,9 @@ CONTAS_CASA/
 ├── index.html
 ├── app.css
 ├── app.js
-├── config.js                  URL do projeto + anon key
+├── config.js                  URL, anon key e chave pública VAPID
 ├── manifest.webmanifest
-└── sw.js                      service worker mínimo
+└── sw.js                      service worker: casca, fetch e push
 ```
 
 ## Contas fixas
@@ -112,6 +112,10 @@ No rodapé, **"Avisar neste aparelho"** liga as notificações, e os três
 interruptores logo abaixo dizem quais avisos você quer receber. Toque liga e
 desliga cada um.
 
+Na tela de login há **"Esqueci a senha"**, com retorno para o próprio app.
+Quem já está dentro encontra **"trocar senha"** no rodapé — importante no
+iPhone, porque o app instalado não enxerga a sessão do Safari.
+
 ## Testes
 
 ```
@@ -128,14 +132,27 @@ separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
 **casa** — `id`, `nome`
 
-**perfil** — `id` (= `auth.uid()`), `casa_id`, `nome`
+**perfil** — `id` (= `auth.uid()`), `casa_id`, `nome`,
+`avisa_vespera_20h`, `avisa_dia_12h`, `avisa_dia_20h` (preferências de aviso
+por pessoa, todas `default true`).
 
 **lancamento** — `id`, `casa_id`, `modelo_id` (nulo em conta digitada na mão;
-preenchido no que veio das contas fixas),
-`competencia` (date, sempre dia 1 do mês), `descricao`, `dia_vencimento` (int),
-`vencimento` (date), `valor_previsto` (numeric, anulável), `valor_pago`
-(numeric, anulável), `pago` (bool), `pago_em`, `pago_por`, `observacao`,
+preenchido no que veio das contas fixas), `competencia` (date, sempre dia 1 do
+mês), `descricao`, `dia_vencimento` (int), `vencimento` (date),
+`valor_previsto` (numeric, anulável), `valor_pago` (numeric, anulável),
+`pago` (bool), `pago_em`, `pago_por`, `observacao`, `parcela_n`, `parcela_de`,
+`codigo_pagamento`, `codigo_tipo`, `criado_em`, `atualizado_em`.
+
+**modelo** — `id`, `casa_id`, `descricao`, `dia_vencimento`, `valor_padrao`
+(anulável), `ativo`, `parcelas_total`, `parcela_1`, `pix_estatico`,
 `criado_em`, `atualizado_em`.
+
+**push_inscricao** — `id`, `casa_id`, `perfil_id`, `endpoint`, `p256dh`,
+`auth`, `aparelho`, `criado_em`, `ultimo_envio`, `falhas`, `ultimo_erro`.
+
+**aviso_enviado** — `id`, `casa_id`, `perfil_id` (nulo no aviso antigo da casa
+inteira), `dia`, `slot`, `enviado_em`; não é lido nem escrito pelo app, só
+pelo robô com a chave de serviço.
 
 Detalhe que manda no desenho da tela: **`valor_previsto` nulo é a conta cujo
 valor ainda não se sabe** — o "???" da nota. Ela aparece como campo a preencher
@@ -151,16 +168,48 @@ cliente.
 
 ## Segurança
 
-- RLS ligado e forçado nas cinco tabelas (`casa`, `perfil`, `lancamento`,
-  `modelo`, `push_inscricao`), isolando por `casa_id` — e por pessoa, no caso
-  das inscrições de aviso.
+- RLS ligado e forçado nas tabelas de dados da casa (`casa`, `perfil`,
+  `lancamento`, `modelo`, `push_inscricao`, `aviso_enviado`), isolando por
+  `casa_id` — e por pessoa, no caso das inscrições e das preferências de aviso.
 - No frontend só a `anon key`, que é pública por desenho — quem protege os
   dados é a RLS, não o segredo da chave.
-- `service_role key`, chave privada VAPID e token do Telegram: só em GitHub
-  Secrets. Nunca no repositório.
+- `service_role key` e chave privada VAPID ficam só em GitHub Secrets. Nunca no
+  repositório.
 - **Nenhum dado financeiro real entra neste repositório.** Nem valor, nem nome
   de credor, nem nome de familiar, nem print. Todo seed e todo exemplo usa dado
   fictício.
+
+## Estado atual
+
+Os blocos **1 a 10** estão concluídos. A bancada fecha em
+`154 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+
+- Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
+  recuperação de senha) estão implementados e no ar.
+- **Realtime entre dois aparelhos** foi validado manualmente: a mudança feita
+  num aparelho aparece no outro praticamente imediatamente. A bancada cobre o
+  lado local; a validação manual cobre a travessia da rede.
+- **Telegram** e **offline com IndexedDB** foram removidos do roadmap e não
+  voltam.
+
+## Roadmap
+
+Os próximos blocos são, nesta ordem:
+
+```text
+11 → 13 → 14 → 12
+```
+
+| bloco | entrega | observação |
+|---|---|---|
+| **11** | geração automática do mês | reusa `gerar_mes()`; o botão manual deixa de ser necessário |
+| **13** | histórico | listar meses, previsto, pago, a pagar e número de contas |
+| **14** | receitas | nova tabela `receita`, separada de `lancamento` |
+| **12** | gráficos | só depois de histórico e receitas estabilizados |
+
+As decisões de desenho de “Parcelar” direto no lançamento e da UX do código de
+pagamento estão registradas em `ESTADO.md`, nas seções **ESTADO ATUAL** e
+**ROADMAP**.
 
 ## Fases
 
@@ -169,7 +218,7 @@ repositório; **medido** é a bancada ou a prova de RLS dizendo que funciona;
 **validado** é alguém tendo usado aquilo num aparelho de verdade. O `ESTADO.md`
 tem o quadro item por item.
 
-**Fase 1 — escrita, medida e validada.** Estrutura e SQL; login por e-mail e
+**Fase 1 — escrita e medida; validação item a item no `ESTADO.md`.** Estrutura e SQL; login por e-mail e
 senha; tela do mês agrupada por dia de vencimento; toque único marca e desmarca
 pago; selo "pago por fulano, 14:32"; cabeçalho fixo com previsto / pago / a
 pagar e a contagem de itens em aberto sem valor; editar valor; adicionar conta
@@ -177,9 +226,9 @@ avulsa; apagar conta segurando o dedo; navegar entre meses; PWA instalável;
 contas fixas com geração do mês (que era da fase 3 e veio para cá, porque sem
 ela o app perdia do app de notas no dia 1º).
 
-Uma coisa da fase 1 continua **sem validação**: o **sync em tempo real entre
-dois aparelhos**. A bancada prova que o app reage ao evento; ninguém provou
-ainda que o evento atravessa a rede.
+O **sync em tempo real entre dois aparelhos** está implementado, medido na
+bancada e validado manualmente em produção. O mecanismo é
+`postgres_changes` filtrado por `casa_id`, reaplicado pelo `aplicarDeFora()`.
 
 **Fase 2 — escrita, medida e validada.** Web Push com VAPID e cron diário no
 GitHub Actions. O Secret está posto, o cron roda todo dia e **a notificação
@@ -196,9 +245,6 @@ fazer sentido — conta que vence hoje não chega de madrugada —, e a tabela
 `aviso_enviado` garante um aviso por casa, por dia e por slot, mesmo com o robô
 rodando doze vezes.
 
-Continuam por fazer o bot do Telegram, como redundância, e o offline com
-IndexedDB.
-
 São **até três avisos por dia, e só quando há o que dizer**:
 
 | quando | o que diz |
@@ -214,17 +260,12 @@ escolhe quais dos três quer**, nos três interruptores embaixo do botão de
 avisos. A escolha é da pessoa, não do aparelho: desligar num aparelho desliga
 em todos os dela.
 
-Os três avisos e a escolha por pessoa são do bloco 7, e **ainda não foram
-vistos chegar num aparelho** — o que já foi validado em produção é o aviso
-único.
-
 **Fase 0 — auditoria e estabilização, feita depois das outras duas.** Bancada
 que sabe ficar vermelha e roda no CI, `npm ci` com lockfile, quatro furos de
 RLS e de permissão fechados no SQL. Sem funcionalidade nova. Os consertos de
-SQL só valem no banco depois de rodar os arquivos de novo — está no `ESTADO.md`.
+SQL foram reaplicados no banco em 05/09/2026; o detalhe está no `ESTADO.md`.
 
-**Fase 3 — começada pelas parcelas.** O bloco 9 tirou dela o controle de
-parcelas, que era o buraco que custava trabalho todo mês: cinco contas não são
-mensais para sempre e voltavam sozinhas. Continuam por fazer, e sem nada
-preparado de véspera: geração automática do mês sem apertar botão, gráficos,
-importação de histórico, receitas.
+**Blocos 8, 9 e 10 — concluídos depois da fase 0.** O bloco 9 tirou o buraco
+das parcelas; o bloco 8 pôs o código de pagamento no lançamento; o bloco 10
+devolveu ao usuário a capacidade de trocar a senha e recuperar o acesso.
+Continuam pendentes os blocos do roadmap acima.

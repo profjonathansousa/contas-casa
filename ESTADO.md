@@ -1,6 +1,183 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 02/09/2026 — fim da fase 0: auditoria e estabilização. NO AR.
+Atualizado em 06/09/2026 — documentação alinhada ao código e auditoria do
+roadmap 11 → 13 → 14 → 12. NO AR.
+
+## ESTADO ATUAL
+
+### O que está de pé
+
+- Blocos **1 a 10** concluídos e no ar.
+- Bancada verde em **154 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+  confere o placar e
+  derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
+  sem atualização explícita.
+- **Realtime validado manualmente entre dois aparelhos.** A bancada cobre o
+  lado local (`aplicarDeFora()`); a validação manual cobre a travessia da rede
+  via Supabase Realtime filtrado por `casa_id`.
+- Bloco **8** (código de pagamento), bloco **9** (parcelas) e bloco **10**
+  (troca e recuperação de senha) estão implementados e no ar.
+- **Telegram** e **offline com IndexedDB** foram removidos do roadmap e não
+  voltam.
+
+### Quadro de implementado, testado e validado
+
+Três colunas diferentes, e a diferença importa: **implementado** é código
+escrito; **testado** é medido pela bancada ou pela prova de RLS no banco;
+**validado em produção** é alguém tendo usado aquilo num aparelho de verdade.
+A terceira coluna é a que quase sempre falta.
+
+| coisa | implementado | testado | validado em produção |
+|---|---|---|---|
+| login por e-mail e senha | sim | sim (senha errada, sessão sem perfil) | sim, só o Jonathan |
+| tela do mês, totais, agrupamento | sim | sim (81 medidas) | sim |
+| toque marca e desmarca pago | sim | sim | sim |
+| selo "pago por fulano" | sim | sim | sim |
+| editar valor, conta avulsa, apagar | sim | sim | sim |
+| navegar entre meses | sim | sim | sim |
+| contas fixas e gerar o mês | sim | sim (banco + bancada) | sim |
+| PWA instalável e service worker | sim | sim (23 medidas) | sim, no iPhone do Jonathan |
+| RLS isolando por casa | sim | sim (prova 04, com controle negativo) | sim |
+| **Realtime entre dois aparelhos** | sim | sim (o lado do app reage a evento fabricado) | **sim — validado manualmente entre dois aparelhos** |
+| **Web Push: inscrever o aparelho** | sim | não (não dá para medir fora do navegador) | sim: 1 inscrição no banco |
+| **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **sim — chegou no iPhone; último envio 03/09/2026** |
+| **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
+| **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
+| **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
+| **contas que acabam (parcelas)** | sim (bloco 9) | sim | **sim — confirmado por Jonathan em 05/09; 3 contas fixas já parceladas no banco** |
+| **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — no ar, mas nenhum código colado ainda** |
+| **trocar e recuperar a senha** | sim (bloco 10) | sim (154/4/27/49 inclui os controles) | **não — ainda não exercitado num aparelho depois do bloco 10** |
+| segundo morador (a esposa) | — | — | **não: nunca entrou** |
+
+### Validações manuais ainda pendentes
+
+1. **Primeiro código de pagamento colado** e conferido num aparelho.
+2. **Login da segunda pessoa da casa** e inscrição do aparelho dela nos avisos.
+3. **Aviso de véspera / por pessoa** chegando de verdade num aparelho, além do
+   aviso único já validado.
+
+O **Realtime entre dois aparelhos** já está validado manualmente; não é uma
+pendência, mas deve ser revalidado em qualquer mudança futura que toque no
+`postgres_changes` ou no redesenho da tela.
+
+### Decisões registradas nesta auditoria
+
+Nada abaixo está implementado. São decisões de desenho e pontos a auditar
+antes de abrir os blocos 11–14.
+
+**Bloco 11 — geração automática do mês**
+
+- Reaproveitar `gerar_mes()`; a chamada passa a acontecer ao abrir o mês e ao
+  navegar entre meses, não por botão.
+- **Ainda não implementado.** O desenho planejado é:
+  abrir/carregar mês → verificar geração → `gerar_mes()` → respeitar `ativo`,
+  parcelas, PIX estático e idempotência → atualizar a tela.
+- **Questões arquiteturais a auditar antes de implementar:**
+  - concorrência entre dois aparelhos;
+  - suficiência da idempotência atual (hoje `NOT EXISTS` por descrição);
+  - eventual necessidade de constraint única e de `ON CONFLICT`;
+  - comportamento com mês parcialmente preenchido;
+  - garantir que lançamentos existentes não sejam alterados;
+  - momento correto da chamada;
+  - eventual remoção do botão “Trazer N contas fixas”.
+
+**Bloco 13 — histórico**
+
+- `lancamento.competencia` já é suficiente para a primeira versão; não é
+  preciso criar tabela nova.
+- Recomendação de arquitetura: função RPC `historico()` em SQL, `security
+  invoker`, agrupando por competência, para que o Postgres/REST devolva a
+  agregação sob a RLS. Alternativa aceitável para o volume atual: buscar os
+  lançamentos da casa e agregar no cliente, mas a RPC é mais simples e barata.
+- A primeira tela lista apenas meses que possuem lançamento; tocar num mês
+  chama a tela mensal existente.
+
+**Bloco 14 — receitas**
+
+- Criar `receita` separada, sem generalizar `lancamento`. Campos iniciais
+  sugeridos: `id`, `casa_id`, `competencia`, `descricao`, `valor`, `recebido`,
+  `recebido_em`, `recebido_por`, `observacao`, `criado_em`, `atualizado_em`.
+- Aplicar RLS por `casa_id`, trigger de autoria/hora para `recebido` análogo ao
+  de `lancamento`, e incluir `receita` na publicação Realtime com filtro por
+  casa.
+- A tela mensal passa a ter um canal Realtime para `lancamento` e outro para
+  `receita` (ou um canal com duas assinaturas); não usar a mesma lógica cega.
+- Totais da tela mensal e gráficos (bloco 12) passam a considerar receitas
+  depois do bloco 14.
+
+**Bloco 12 — gráficos**
+
+- Só implementar depois de 13 e 14, para não refazer agregação.
+- Para “despesas por categoria” será necessário um campo formal de categoria
+  em `lancamento` (e provavelmente em `receita`); **sem classificação
+  automática por IA**.
+- Usar SVG/CSS nativo ou uma pequena camada desenhada à mão, sem framework de
+  gráfico no frontend.
+
+**“Parcelar” direto no lançamento**
+
+- **Ainda NÃO implementado.** Registrado como decisão/questão de produto para
+  auditoria antes da implementação.
+- Reusar `modelo`, sem criar entidade de “série”.
+- Ação nova na linha do lançamento: `Parcelar`.
+- No primeiro uso, criar ou ativar um `modelo` correspondente por descrição
+  normalizada; preencher `parcelas_total` e `parcela_1`; vincular o lançamento
+  atual (`modelo_id`) e preencher `parcela_n` / `parcela_de`; `gerar_mes()`
+  continua cuidando dos próximos meses.
+- Preferência de implementação: função RPC `parcelar_lancamento(...)` em SQL,
+  `security invoker`, para que a criação/ativação do modelo e a atualização do
+  lançamento sejam atômicas sob RLS. O cliente passa `lancamento_id`,
+  `parcelas_total` e `parcela_1`; `parcela_1` vem preenchida com a competência
+  do lançamento atual, mas permanece editável.
+- Se o lançamento tiver PIX estático, copiar para `modelo.pix_estatico`; não
+  copiar boleto/arrecadação nem PIX dinâmico.
+
+**UX do código de pagamento**
+
+- **Ainda NÃO implementado no código atual.** É melhoria pendente.
+- O rótulo do botão passa a depender do `codigo_tipo`:
+  `PIX → copiar código PIX`, `boleto → copiar código do boleto`,
+  `arrecadacao → copiar código da conta`.
+- `alterar` e `remover` ficam visíveis, não apenas no toque longo. O toque
+  longo pode continuar como atalho.
+- `alterar` abre a mesma folha de código já existente, preenchida; `remover`
+  limpa o código. Sem confirmação extra, mantendo o mesmo custo de um toque do
+  restante do app.
+
+## ROADMAP
+
+```text
+11 → 13 → 14 → 12
+```
+
+| bloco | entrega |
+|---|---|
+| **11** | geração automática do mês, reaproveitando `gerar_mes()` |
+| **13** | histórico: meses, previsto, pago, a pagar, número de contas |
+| **14** | receitas em tabela separada `receita` |
+| **12** | gráficos, só depois que histórico e receitas estiverem estáveis |
+
+Gráficos ficam por último de propósito: devem ser construídos sobre um modelo
+financeiro já estável, com histórico e receitas definidos, para não nascerem
+sobre agregações que depois mudam.
+
+## PRÓXIMO PASSO
+
+1. **Não implementar os blocos 11–14 ainda.** Primeiro fechar esta auditoria
+   documental; depois auditar a arquitetura dos próximos blocos.
+2. **Colar o primeiro código de pagamento** e conferir que o valor vem
+   sozinho — pendência do bloco 8.
+3. **A segunda pessoa da casa entra no app** e liga os avisos no aparelho
+   dela — pré-requisito humano dos avisos por pessoa.
+4. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
+   ou no mecanismo de `postgres_changes`.
+5. Depois dessas pendências humanas, seguir o roadmap **11 → 13 → 14 → 12**,
+   em blocos pequenos, com auditoria antes e depois e com a bancada verde.
+
+## HISTÓRICO TÉCNICO
+
+O restante deste arquivo preserva o registro técnico de cada bloco. Está
+mantido como foi escrito; o estado que vale agora é o da seção acima.
 
 ## Duas contagens diferentes, e a confusão entre elas
 
@@ -34,34 +211,6 @@ Os blocos 2 e 3 se cruzam no histórico: a publicação foi registrada às 08:04
 o ajuste do toque longo às 08:28. A fronteira entre os dois não é limpa, e não
 adianta fingir que é.
 
-## Em que grau cada coisa está de pé
-
-Três colunas diferentes, e a diferença importa: **implementado** é código
-escrito; **testado** é medido pela bancada ou pela prova de RLS no banco;
-**validado em produção** é alguém tendo usado aquilo num aparelho de verdade.
-A terceira coluna é a que quase sempre falta.
-
-| coisa | implementado | testado | validado em produção |
-|---|---|---|---|
-| login por e-mail e senha | sim | sim (senha errada, sessão sem perfil) | sim, só o Jonathan |
-| tela do mês, totais, agrupamento | sim | sim (81 medidas) | sim |
-| toque marca e desmarca pago | sim | sim | sim |
-| selo "pago por fulano" | sim | sim | sim |
-| editar valor, conta avulsa, apagar | sim | sim | sim |
-| navegar entre meses | sim | sim | sim |
-| contas fixas e gerar o mês | sim | sim (banco + bancada) | sim |
-| PWA instalável e service worker | sim | sim (23 medidas) | sim, no iPhone do Jonathan |
-| RLS isolando por casa | sim | sim (prova 04, com controle negativo) | sim |
-| **Realtime entre dois aparelhos** | sim | só o lado do app, com evento fabricado | **não** |
-| **Web Push: inscrever o aparelho** | sim | não (não dá para medir fora do navegador) | sim: 1 inscrição no banco |
-| **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **sim — chegou no iPhone; último envio 03/09/2026** |
-| **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
-| **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
-| **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
-| **contas que acabam (parcelas)** | sim (bloco 9) | sim | **sim — confirmado por Jonathan em 05/09; 3 contas fixas já parceladas no banco** |
-| **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — no ar, mas nenhum código colado ainda** |
-| segundo morador (a esposa) | — | — | **não: nunca entrou** |
-
 ## O que foi feito
 
 - Pasta de trabalho criada em
@@ -79,6 +228,17 @@ A terceira coluna é a que quase sempre falta.
   valor previsto, para testar a tela antes de digitar conta de verdade.
 - `sql/04_prova_rls.sql` — prova a RLS fingindo ser um usuário autenticado,
   com controle negativo (um id sem perfil tem que enxergar zero).
+- `sql/05_modelos.sql` — tabela `modelo`, `gerar_mes()` e `fixar_mes()`.
+- `sql/06_push.sql` — `push_inscricao` e `resumo_do_dia()`.
+- `sql/07_avisos.sql` — `aviso_enviado`, a memória de um aviso por dia e por
+  slot.
+- `sql/08_avisos_por_pessoa.sql` — preferências de aviso no `perfil` e aviso
+  da véspera.
+- `sql/09_parcelas.sql` — `parcelas_total` / `parcela_1` no `modelo`,
+  `parcela_n` / `parcela_de` no `lancamento`, e a função `parcela_no_mes()`.
+- `sql/10_codigo_pagamento.sql` — `codigo_pagamento` / `codigo_tipo` no
+  `lancamento`, `pix_estatico` no `modelo`, e a leitura de boleto,
+  arrecadação e PIX no `app.js`.
 
 ## O que faltava na fase 1 (lista de 31/08, hoje toda cumprida)
 
@@ -146,7 +306,7 @@ Decisões tomadas no caminho:
 
 `./testes/rodar.sh` — roda o `app.js` e o `sw.js` reais no `jsc` com o mundo
 em volta falsificado. Placar naquele dia: **55 / 4 / 11 medidas, 0 falhas.**
-(Depois dos blocos 4 e 5 virou 81 / 4 / 23 / 11, que é o placar de hoje.)
+(Depois dos blocos 4 e 5 virou 81 / 4 / 23 / 11, naquele ponto da história.)
 
 A bancada lê o `index.html` real para saber quais elementos nascem escondidos.
 Um controle negativo pegou exatamente esse erro: com os elementos nascendo
@@ -235,17 +395,18 @@ Para conferir os números, olhar o banco. O seed fictício de agosto foi apagado
 
 1. **Login de verdade.** Nunca entrei no app; não tenho senha de ninguém.
    (Jonathan confirmou que entrou e instalou na tela de início. A esposa ainda não.)
-2. **Realtime entre dois aparelhos.** A bancada prova que o app reage ao
-   evento; ela não prova que o evento chega pela rede.
+2. **Realtime entre dois aparelhos.** *Histórico: naquele dia ainda não havia
+   validação; depois foi validado manualmente — ver ESTADO ATUAL.* A bancada
+   provava que o app reage ao evento, mas não provava a travessia da rede.
 3. **Contas fixas no aparelho.** Provei no banco e na bancada, não no iPhone.
 
 ## Buraco conhecido
 
 Cinco das contas de setembro **não são mensais para sempre** — são acordos
-parcelados, uma parcela de imposto e um material escolar. Controle de parcelas
-é fase 3. Enquanto não existir, essas contas voltam todo mês se estiverem
-ligadas nas fixas, e cabe a Jonathan desligá-las quando acabarem. Quais são
-elas está no banco e na conversa, não aqui.
+parcelados, uma parcela de imposto e um material escolar. Este buraco foi
+fechado pelo bloco 9, que pôs o controle de parcelas em `modelo` e
+`lancamento`. O registro abaixo ficou como estava para preservar a ordem dos
+fatos.
 
 ## Bloco 5 — notificação push (31/08/2026)
 
@@ -294,14 +455,15 @@ gh secret set SUPABASE_SERVICE_ROLE -R profjonathansousa/contas-casa
 1. **Envio de verdade.** Nenhuma notificação chegou a nenhum aparelho ainda.
    Falta o segredo acima e falta alguém inscrito.
 2. **Login da esposa.** Nunca aconteceu.
-3. **Realtime entre dois aparelhos.**
+3. **Realtime entre dois aparelhos.** *Histórico: já validado depois; ver
+   ESTADO ATUAL.*
 4. **Pontualidade do cron.** O do GitHub entra em fila e atrasa; não é defeito
    nosso, é como ele funciona.
 
 ## Fora do escopo do bloco 5, de propósito
 
-Bot do Telegram (a redundância) e offline com IndexedDB continuam por fazer.
-Controle de parcelas continua na fase 3.
+Registrado depois: **Telegram como redundância** e **offline com IndexedDB**
+foram removidos do roadmap. O controle de parcelas virou o bloco 9, concluído.
 
 ## Fase 0 — auditoria e estabilização (02/09/2026)
 
@@ -414,7 +576,9 @@ sai certo no singular, no plural, na lista longa e no dia vazio.
 
 O que a bancada **não** prova, e nenhum teste automático aqui vai provar:
 que o evento atravessa a rede até o outro aparelho, e que a notificação chega.
-Isso é validação manual, e está pendente — a lista está logo abaixo.
+Isso é validação manual. O Realtime entre dois aparelhos já foi validado
+depois (ver ESTADO ATUAL); continuam pendentes a validação do aviso de
+véspera/por pessoa e o primeiro código colado.
 
 ### Divergência entre o banco e o repositório
 
@@ -704,17 +868,9 @@ aberto.
 
 ## Roadmap — blocos 6 a 9
 
-| bloco | o que é | estado | depende de |
-|---|---|---|---|
-| **6** | pontualidade do agendador | **feito e no ar** | — |
-| **7** | três avisos, um por pessoa | **escrito e medido**, espera `sql/08` + merge | bloco 6 e o login da segunda pessoa |
-| **9** | parcelas | desenhado abaixo | nada |
-| **8** | código de barras / PIX colado | desenhado | nada |
-
-Ordem recomendada: **6 → 7 → 9 → 8**. Parcelas passa na frente do código de
-pagamento por dois motivos: é o que custa trabalho manual todo mês, e uma conta
-parcelada que já acabou e continua voltando vira, com os avisos do bloco 7,
-**três alarmes falsos por dia**. Ou seja, o bloco 9 protege o 7.
+Este roadmap de 05/09 foi concluído: **6**, **7**, **9** e **8** estão no ar.
+O próximo roadmap é **11 → 13 → 14 → 12** e está descrito na seção
+**Estado atual e decisões para os próximos blocos**, no topo deste arquivo.
 
 ## Bloco 9 — parcelas (desenho, 05/09/2026)
 
@@ -910,12 +1066,11 @@ conversa**.
 Nos arquivos de teste "Marina" continua, e está certo: ali é dado fictício de
 propósito, como o "Jonathan" que também é só um rótulo da bancada.
 
-### O que falta
+### O que faltava naquele dia
 
-**Preencher as cinco contas** que já existem, pela tela: abrir "contas fixas",
-tocar na linha "todo dia N" de cada uma e dizer quantas parcelas e o mês da
-primeira. Quais são elas está no banco e na conversa, **não aqui**. Enquanto
-isso não for feito, o bloco 9 está no ar sem estar em uso.
+*Histórico.* Na época faltava preencher as cinco contas pela tela. Isso foi
+resolvido depois: Jonathan confirmou as parcelas em produção, e há três contas
+fixas já parceladas no banco. O estado atual está na seção **ESTADO ATUAL**.
 
 ## Bloco 8 — o código de pagamento colado (05/09/2026)
 
@@ -1133,8 +1288,9 @@ ou do painel do Supabase.
 3. ~~Aviso diário, modo seco.~~ **Feito.**
 4. ~~Aviso diário de verdade.~~ **Feito: a notificação chegou no iPhone.**
    Fica no lugar dela a pontualidade do cron, acima.
-5. **Realtime entre dois aparelhos.** Duas telas abertas na mesma casa, marcar
-   pago numa e ver a outra mudar sozinha, sem recarregar.
+5. ~~**Realtime entre dois aparelhos.**~~ **Feito: validado manualmente.**
+   Manter essa validação em mudanças futuras que toquem no
+   `postgres_changes` ou no redesenho da tela.
 6. **Login da esposa**, e a inscrição do aparelho dela nos avisos.
 7. **Ligar a proteção de senha vazada** no Supabase (Authentication > Policies),
    apontada pelo linter: hoje está desligada, e é um clique.
@@ -1161,25 +1317,3 @@ tivesse sido só mudar o minuto do cron, o aviso de hoje teria se perdido.
 
 `pessoas: 2` é o laço por pessoa do bloco 7 rodando em produção pela primeira
 vez, lendo as colunas novas do perfil sem erro.
-
-## O roadmap acabou
-
-Os quatro blocos combinados em 05/09 estão no ar: **6** (pontualidade), **7**
-(três avisos por pessoa), **9** (parcelas) e **8** (código colado). O que resta
-não é código — é uso e prova no aparelho.
-
-## PRÓXIMA AÇÃO EXATA
-
-1. **Definir senhas novas pelo painel** e guardá-las no Chaveiro do iPhone no
-   login seguinte. Hoje o acesso depende de uma sessão de 31/08.
-2. **Colar o primeiro código** numa conta e conferir que o valor vem sozinho.
-2. **Conferir no Actions a que horas os runs de hoje dispararam** e se o aviso
-   chegou perto do meio-dia. É a medição que decide se o GitHub serve ou se a
-   conversa do `pg_cron` volta. Primeira execução do cron novo: 15:17 UTC.
-2. ~~Rodar `sql/08` e mesclar o bloco 7.~~ **Feito.** ~~E o `sql/09` do bloco
-   9.~~ **Feito.**
-3. **A segunda pessoa da casa entra no app** e liga os avisos no iPhone dela.
-   Sem isso o bloco 7 não tem para onde mandar as 20h.
-4. **Realtime com dois aparelhos** — a última coisa da fase 1 sem prova.
-5. Rodar `sql/04_prova_rls.sql` depois das migrações de 05/09.
-6. Depois: bloco 9 (parcelas), bloco 8 (código colado).
