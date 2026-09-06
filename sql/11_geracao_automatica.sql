@@ -68,17 +68,20 @@ create table if not exists public.mes_gerado (
 -- convenção do cliente; sem os dois verbos, é propriedade do banco. Um mês,
 -- uma vez nascido, não desnasce.
 --
--- E o INSERT precisa de mais do que "é da minha casa". A tabela fica exposta
--- em /rest/v1/mes_gerado como qualquer outra: com só o casa_id conferido,
--- qualquer sessão logada poderia gravar à mão a marca de um mês FUTURO — e
--- aquele mês nunca nasceria, porque garantir_mes() encontraria a marca e
--- devolveria zero. Um POST de uma linha apagaria a geração automática de um
--- mês inteiro, em silêncio. Também daria para forjar origem = 'backfill' e
--- corromper o único registro que distingue "nasceu aqui" de "já era".
+-- E o cliente não escreve aqui de jeito nenhum. A tabela fica exposta em
+-- /rest/v1/mes_gerado como qualquer outra, e uma policy de INSERT — por mais
+-- estreita que fosse — ainda deixaria a sessão logada gravar À MÃO a marca do
+-- mês corrente sem gerar nada. Aí garantir_mes() encontraria a marca, devolveria
+-- zero e não chamaria gerar_mes(): o mês ficaria marcado como nascido sem ter
+-- nascido, e as contas do mês simplesmente não viriam. Um POST de uma linha,
+-- em silêncio, contra as duas invariantes do bloco ("no máximo uma geração por
+-- competência" e "toda marca é verdadeira").
 --
--- Por isso o with check exige as três coisas juntas. A competência sai da
--- MESMA expressão que garantir_mes() usa, e não de um parâmetro: não existe
--- valor que o cliente possa mandar para escolher outro mês.
+-- Duas versões anteriores desta migration tentaram fechar isso escolhendo
+-- VALORES aceitáveis (que mês, que origem). O que faltava era fechar
+-- AUTORIDADE: quem pode escrever. Por isso não há grant de INSERT e não há
+-- policy de INSERT. Sem o privilégio, o PostgREST recusa antes de a RLS ser
+-- consultada. A única porta é a função do item 5.
 
 alter table public.mes_gerado enable row level security;
 alter table public.mes_gerado force  row level security;
@@ -86,18 +89,11 @@ alter table public.mes_gerado force  row level security;
 drop policy if exists mes_gerado_ler   on public.mes_gerado;
 drop policy if exists mes_gerado_criar on public.mes_gerado;
 
-create policy mes_gerado_ler   on public.mes_gerado for select to authenticated
+create policy mes_gerado_ler on public.mes_gerado for select to authenticated
   using (casa_id = public.minha_casa());
 
-create policy mes_gerado_criar on public.mes_gerado for insert to authenticated
-  with check (
-        casa_id     = public.minha_casa()
-    and competencia = date_trunc('month', (now() at time zone 'America/Sao_Paulo'))::date
-    and origem      = 'automatico'
-  );
-
-revoke all on public.mes_gerado from anon;
-grant select, insert on public.mes_gerado to authenticated;
+revoke all on public.mes_gerado from anon, authenticated;
+grant select on public.mes_gerado to authenticated;
 
 -- ------------------------------------------------------------
 -- 3. A identidade de um lançamento gerado
@@ -168,7 +164,57 @@ begin
 end $$;
 
 -- ------------------------------------------------------------
--- 5. Garantir o mês corrente
+-- 5. A única porta que grava a marca
+-- ------------------------------------------------------------
+-- Schema separado, e é o schema que faz o trabalho: o PostgREST só publica o
+-- public, então nada aqui dentro vira endpoint. Se este ajudante morasse no
+-- public, um POST em /rest/v1/rpc/marcar_mes_corrente reabriria a brecha
+-- inteira — agora com autoridade de dono de tabela, que é pior.
+
+create schema if not exists privado;
+revoke all   on schema privado from public, anon;
+grant  usage on schema privado to authenticated;
+
+-- SEM PARÂMETRO, e é isso que o torna seguro: casa e mês ele calcula sozinho,
+-- do JWT e do relógio de São Paulo. Não existe valor que o cliente possa
+-- mandar para marcar outro mês ou a casa de outra pessoa. É a única coisa que
+-- este definer faz — gravar uma linha cujas colunas todas ele mesmo decide.
+--
+-- security definer aqui, e SÓ aqui. Foi tentador marcar o garantir_mes()
+-- inteiro como definer: seria um diff menor e fecharia a mesma porta. Mas o
+-- dono da função no Supabase é o postgres, que tem rolbypassrls — e o
+-- gerar_mes(), chamado lá de dentro, passaria a rodar com a RLS DESLIGADA em
+-- modelo e lancamento. Medido numa réplica com duas casas: a mesma consulta
+-- devolve 0 lançamentos como authenticated e 1 (o da outra casa) dentro de um
+-- definer. O gerar_mes() continuaria correto, porque filtra por casa_id em
+-- todo lugar — mas o where viraria a única parede entre as casas, em vez da
+-- segunda. Não vale trocar uma invariante por outra.
+
+create or replace function privado.marcar_mes_corrente(out mes date, out nasceu boolean)
+returns record
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare c uuid;
+begin
+  c := public.minha_casa();
+  if c is null then raise exception 'Você não pertence a nenhuma casa.'; end if;
+
+  mes := date_trunc('month', (now() at time zone 'America/Sao_Paulo'))::date;
+
+  insert into public.mes_gerado (casa_id, competencia, origem)
+  values (c, mes, 'automatico')
+  on conflict do nothing;
+
+  nasceu := found;
+end $$;
+
+revoke all    on function privado.marcar_mes_corrente() from public, anon;
+grant execute on function privado.marcar_mes_corrente() to authenticated;
+
+-- ------------------------------------------------------------
+-- 6. Garantir o mês corrente
 -- ------------------------------------------------------------
 -- NÃO recebe competência, e é a assinatura que faz a garantia: não existe
 -- pedido que o cliente possa formular para gerar um mês histórico. Navegar
@@ -186,37 +232,40 @@ end $$;
 -- "criadas = 0" quer dizer literalmente "as contas já estão gravadas", nunca
 -- "estão a caminho". É isso que impede o mês pela metade.
 
+-- CONTINUA security invoker, de propósito: assim o gerar_mes() chamado aqui
+-- roda como a pessoa, e a RLS de modelo e lancamento segue valendo como
+-- segunda parede. O único trecho com autoridade de dono é a gravação da marca,
+-- no item 5. Medido: dentro desta função, current_user = authenticated e o
+-- lançamento da outra casa continua invisível.
+--
+-- O mês vem do item 5, uma vez só. Recalcular aqui seria ter duas fontes de
+-- verdade para "que mês é hoje" — exatamente o que este bloco existe para
+-- evitar.
+
 create or replace function public.garantir_mes()
 returns table (competencia date, criadas int)
 language plpgsql
 security invoker
 set search_path = public
 as $$
-declare c uuid; mes date;
+declare m record;
 begin
-  c := public.minha_casa();
-  if c is null then raise exception 'Você não pertence a nenhuma casa.'; end if;
+  select * into m from privado.marcar_mes_corrente();
 
-  mes := date_trunc('month', (now() at time zone 'America/Sao_Paulo'))::date;
-
-  insert into public.mes_gerado (casa_id, competencia, origem)
-  values (c, mes, 'automatico')
-  on conflict do nothing;
-
-  if not found then
+  if not m.nasceu then
     -- o mês já tinha nascido: por este aparelho, por outro, ou pelo backfill
-    return query select mes, 0;
+    return query select m.mes, 0;
     return;
   end if;
 
-  return query select mes, public.gerar_mes(mes);
+  return query select m.mes, public.gerar_mes(m.mes);
 end $$;
 
 revoke all    on function public.garantir_mes() from public, anon;
 grant execute on function public.garantir_mes() to authenticated;
 
 -- ------------------------------------------------------------
--- 6. Backfill: os meses que já tinham nascido pelo botão
+-- 7. Backfill: os meses que já tinham nascido pelo botão
 -- ------------------------------------------------------------
 -- Sem isto, o primeiro app aberto depois desta migration marcaria o mês
 -- corrente como novo e rodaria a geração nele. Hoje isso criaria zero linhas
@@ -240,10 +289,11 @@ grant execute on function public.garantir_mes() to authenticated;
 -- anon têm false). RLS não se aplica, então o 'backfill' passa mesmo com a
 -- policy de INSERT exigindo origem = 'automatico' e o mês corrente.
 --
--- E o backfill PRECISA desse contexto: o select lê public.lancamento de todas
--- as casas, o que authenticated não enxerga. Rodar isto como authenticated não
--- falharia em silêncio — a policy recusaria o insert com erro. Mas o lugar
--- certo é o SQL Editor.
+-- E o backfill PRECISA desse contexto por dois motivos: o select lê
+-- public.lancamento de todas as casas, o que authenticated não enxerga; e
+-- authenticated não tem mais nem o privilégio de INSERT nesta tabela. Rodar
+-- isto como authenticated não falharia em silêncio — apanharia com
+-- "permission denied for table mes_gerado". O lugar certo é o SQL Editor.
 
 insert into public.mes_gerado (casa_id, competencia, gerado_em, origem)
 select distinct l.casa_id, l.competencia, now(), 'backfill'

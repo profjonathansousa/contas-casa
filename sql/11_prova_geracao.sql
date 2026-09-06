@@ -41,23 +41,29 @@ select 'rls da marca' as parte,
        (select array_agg(polname order by polname) from pg_policy
          where polrelid = c.oid) as politicas
   from pg_class c where c.oid = 'public.mes_gerado'::regclass;
--- esperado: t | t | {mes_gerado_criar,mes_gerado_ler}
--- Só SELECT e INSERT. Se aparecer política de update ou delete, a exclusão
--- durável quebrou: alguém poderia desmarcar o mês e fazer as contas voltarem.
+-- esperado: t | t | {mes_gerado_ler}
+-- SÓ a de leitura. Não há policy de INSERT porque não há grant de INSERT: o
+-- cliente não escreve nesta tabela por caminho nenhum. Se aparecer política de
+-- update ou delete, a exclusão durável quebrou; se aparecer uma de insert,
+-- alguém reabriu a porta de marcar o mês sem gerar.
 
 -- ---------- medição 3: grants — o anon não entra ----------
 select 'grants' as parte,
        has_table_privilege('anon', 'public.mes_gerado', 'SELECT')          as anon_le,
-       has_table_privilege('anon', 'public.mes_gerado', 'INSERT')          as anon_grava,
        has_function_privilege('anon', 'public.garantir_mes()', 'EXECUTE')  as anon_executa,
        has_table_privilege('authenticated', 'public.mes_gerado', 'SELECT') as eu_leio,
        has_table_privilege('authenticated', 'public.mes_gerado', 'INSERT') as eu_gravo,
        has_table_privilege('authenticated', 'public.mes_gerado', 'UPDATE') as eu_atualizo,
-       has_table_privilege('authenticated', 'public.mes_gerado', 'DELETE') as eu_apago;
--- esperado: f | f | f | t | t | f | f
--- Os dois últimos TÊM que ser falsos. O Supabase concede execute a anon por
--- padrão em função nova, e é o revoke da migration que desfaz isso — por isso
--- a terceira coluna é medida, não suposta.
+       has_table_privilege('authenticated', 'public.mes_gerado', 'DELETE') as eu_apago,
+       has_function_privilege('authenticated', 'public.garantir_mes()', 'EXECUTE') as eu_chamo,
+       has_schema_privilege('anon', 'privado', 'USAGE')                    as anon_entra_no_privado,
+       has_function_privilege('anon', 'privado.marcar_mes_corrente()', 'EXECUTE') as anon_marca;
+-- esperado: f | f | t | f | f | f | t | f | f
+-- Os quatro falsos do meio são o coração desta correção: authenticated LÊ a
+-- marca e não escreve nela por caminho nenhum — nem insert, nem update, nem
+-- delete. A única porta é o garantir_mes(), que ele pode executar.
+-- O Supabase concede execute a anon por padrão em função nova, e é o revoke da
+-- migration que desfaz isso — por isso essas colunas são medidas, não supostas.
 
 -- ---------- medição 4: a identidade do lançamento gerado ----------
 select 'identidade da linha' as parte,
@@ -205,28 +211,51 @@ begin
     when others then raise notice 'ok     outra casa recusada (%)', sqlstate;
   end;
 
+  -- CONTROLE NEGATIVO, e o mais importante dos cinco: nem o mes CORRENTE da
+  -- PROPRIA casa com a origem certa pode ser gravado a mao. Se isto passar, da
+  -- para marcar o mes como nascido sem gerar nada — e as contas do mes nao vem.
   begin
     insert into public.mes_gerado (casa_id, competencia, origem)
     values (eu_casa, mes, 'automatico');
+    raise notice 'FALHA  o mes CORRENTE ainda pode ser marcado a mao, sem gerar nada';
     raise exception 'desfazer' using errcode = 'P0001';
   exception
-    when sqlstate 'P0001'       then raise notice 'ok     o caminho legitimo foi ACEITO (e desfeito)';
-    when unique_violation       then raise notice 'ok     a marca do mes corrente ja existe (a PK barrou depois da policy)';
-    when insufficient_privilege then raise notice 'FALHA  a policy recusou o caminho legitimo';
-    when others                 then raise notice 'FALHA  o caminho legitimo quebrou (%)', sqlstate;
+    when sqlstate 'P0001' then null;
+    when others then raise notice 'ok     insert direto do mes corrente recusado (%)', sqlstate;
   end;
 
   begin
     perform * from public.garantir_mes();
     raise exception 'desfazer' using errcode = 'P0001';
   exception
-    when sqlstate 'P0001' then raise notice 'ok     garantir_mes() roda sob a policy nova (e foi desfeito)';
+    when sqlstate 'P0001' then raise notice 'ok     garantir_mes() continua funcionando (e foi desfeito)';
     when others           then raise notice 'FALHA  garantir_mes() quebrou (%)', sqlstate;
   end;
 end $$;
 
 reset role;
 select set_config('request.jwt.claims', null, false);
+
+-- ---------- medição 9: o ajudante não é endpoint ----------
+-- O PostgREST publica só o schema public. Se marcar_mes_corrente aparecer ali,
+-- vira /rest/v1/rpc/marcar_mes_corrente e a brecha volta inteira — agora com
+-- autoridade de dono de tabela.
+select 'o ajudante mora fora do alcance do PostgREST' as parte,
+       (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'  and p.proname = 'marcar_mes_corrente') as em_public,
+       (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'privado' and p.proname = 'marcar_mes_corrente') as em_privado,
+       (select p.prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'privado' and p.proname = 'marcar_mes_corrente') as ele_e_definer,
+       (select p.prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'  and p.proname = 'garantir_mes')        as garantir_e_definer,
+       (select p.pronargs from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'privado' and p.proname = 'marcar_mes_corrente') as argumentos_do_ajudante;
+-- esperado: 0 | 1 | t | f | 0
+-- ele_e_definer = t e garantir_e_definer = f: a autoridade fica no menor
+-- pedaço possível, e o gerar_mes() continua rodando sob a RLS da pessoa.
+-- argumentos_do_ajudante = 0: casa e mês ele calcula sozinho, não recebe.
+
 drop table _quem;
 
 -- ============================================================
@@ -239,7 +268,8 @@ drop table _quem;
 --   6: 2 | 0 | 0 | 0   (as duas últimas colunas zero é o que importa)
 --   7: marcas_que_o_estranho_ve = 0            <- obrigatório
 --   8: seis linhas começando em "ok". Um único "FALHA" ali é buraco aberto:
---      quer dizer que uma sessão logada pode gravar a marca de um mês que ela
---      escolheu, e aquele mês nunca nascerá.
+--      quer dizer que uma sessão logada consegue gravar a marca à mão — e um
+--      mês marcado sem ter sido gerado é um mês que não traz as contas.
+--   9: 0 | 1 | t | f | 0
 -- Qualquer número diferente de zero na medição 7 é RLS furada. Me avise.
 -- ============================================================

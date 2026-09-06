@@ -155,11 +155,12 @@ por pessoa, todas `default true`).
 (`'automatico'` ou `'backfill'`), chave primária `(casa_id, competencia)`. Uma
 linha quer dizer "esta competência desta casa já foi inicializada". É a trava
 que resolve dois aparelhos abrindo o app ao mesmo tempo, e é o que torna
-durável apagar uma conta. Sem UPDATE e sem DELETE, de propósito — e o INSERT só
-aceita a própria casa, o mês corrente de São Paulo calculado no banco e
-`origem = 'automatico'`. Sem isso, um POST à mão marcando um mês futuro faria
-aquele mês nunca nascer. O `'backfill'` só entra pela migration, que roda como
-`postgres`.
+durável apagar uma conta. **O cliente não escreve nela por caminho nenhum**: só
+tem `SELECT`. A única porta é `privado.marcar_mes_corrente()`, `security
+definer` e sem parâmetro, num schema que o PostgREST não publica — casa e mês
+ela calcula sozinha. Sem isso, um POST à mão marcaria o mês como nascido sem
+gerar nada, e as contas daquele mês nunca viriam. O `'backfill'` só entra pela
+migration, que roda como `postgres`.
 
 **lancamento** — `id`, `casa_id`, `modelo_id` (nulo em conta digitada na mão;
 preenchido no que veio das contas fixas), `competencia` (date, sempre dia 1 do

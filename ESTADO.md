@@ -1384,16 +1384,30 @@ momentos diferentes.
   sem DELETE, de propósito: é isso que torna durável apagar uma conta. Se o app
   pudesse desmarcar um mês, a durabilidade seria convenção do cliente; sem os
   dois verbos, é propriedade do banco.
-- **E o INSERT exige três coisas juntas**, não só o `casa_id`. A tabela fica
-  exposta em `/rest/v1/mes_gerado` como qualquer outra: com só a casa conferida,
-  uma sessão logada poderia gravar à mão a marca de um mês **futuro** — e aquele
-  mês nunca nasceria, porque `garantir_mes()` acharia a marca e devolveria zero.
-  Um POST de uma linha apagaria a geração automática de um mês inteiro, em
-  silêncio. Também daria para forjar `origem = 'backfill'`. A policy passou a
-  exigir `casa_id = minha_casa()`, `competencia` igual ao mês corrente de São
-  Paulo **calculado no banco**, e `origem = 'automatico'`. A competência sai da
-  mesma expressão que a função usa, não de um parâmetro: não existe valor que o
-  cliente possa mandar para escolher outro mês.
+- **E o cliente não escreve aqui por caminho nenhum.** Sem grant de INSERT e
+  sem policy de INSERT: o PostgREST recusa antes de a RLS ser consultada. Foram
+  três rodadas de auditoria até chegar aqui, e as duas primeiras erraram do
+  mesmo jeito — fecharam **valores** (que mês, que origem) quando o que faltava
+  era fechar **autoridade** (quem pode escrever). Com uma policy de INSERT, por
+  mais estreita que fosse, a sessão logada ainda gravava à mão a marca do mês
+  corrente sem gerar nada: `garantir_mes()` acharia a marca, devolveria zero e
+  não chamaria `gerar_mes()` — mês marcado como nascido, contas do mês nunca
+  vêm. Um POST de uma linha, em silêncio, contra as duas invariantes do bloco.
+- **A única porta é `privado.marcar_mes_corrente()`**, `security definer`, sem
+  parâmetro, num schema que o PostgREST não publica. Sem parâmetro é o que a
+  torna segura: casa e mês ela calcula do JWT e do relógio de São Paulo, então
+  não existe valor que o cliente possa mandar. Se morasse no `public`, viraria
+  `/rest/v1/rpc/marcar_mes_corrente` e a brecha voltaria inteira, agora com
+  autoridade de dono de tabela.
+- **`garantir_mes()` continua `security invoker`**, e isso é decisão, não
+  descuido. Marcá-la inteira como `definer` fecharia a mesma porta com um diff
+  menor — mas o dono da função no Supabase é o `postgres`, que tem
+  `rolbypassrls`, e o `gerar_mes()` chamado lá de dentro passaria a rodar com a
+  **RLS desligada** em `modelo` e `lancamento`. Medido numa réplica com duas
+  casas: a mesma consulta devolve 0 lançamentos como `authenticated` e 1 (o da
+  outra casa) dentro de um `definer`. O `gerar_mes()` continuaria correto — ele
+  filtra por `casa_id` em todo lugar —, mas o `where` viraria a única parede
+  entre as casas, em vez da segunda.
 - **`lancamento_do_modelo_idx`**, índice único em
   `(casa_id, competencia, modelo_id)`. Não é parcial e não precisa ser:
   lançamento manual tem `modelo_id` nulo, e nulo não colide em índice único.
@@ -1466,11 +1480,15 @@ Antes do commit, na réplica local e como `authenticated`:
 - `authenticated` **não consegue apagar** de `mes_gerado`: `permission denied`.
   Foi descoberto por acidente, tentando limpar a réplica — e é a garantia da
   exclusão durável funcionando.
-- e, sob um usuário real da casa, as quatro marcas proibidas são recusadas com
-  **42501** — a policy, não uma check constraint: mês passado, mês futuro,
-  `origem = 'backfill'` e marca para outra casa. O caminho legítimo passa, e o
-  `garantir_mes()` continua rodando. Está na medição 8 da prova, e nada fica
-  gravado: cada tentativa roda numa subtransação desfeita de propósito.
+- e, sob um usuário real da casa, **cinco** inserts diretos são recusados com
+  **42501 — `permission denied for table mes_gerado`**: mês passado, mês futuro,
+  `origem = 'backfill'`, marca para outra casa e — o que mais importa — o
+  **mês corrente da própria casa com a origem certa**. Esse quinto era aceito na
+  versão anterior e virou controle negativo. O `garantir_mes()` continua
+  funcionando. Está na medição 8 da prova, e nada fica gravado: cada tentativa
+  roda numa subtransação desfeita de propósito.
+- dentro do `garantir_mes()`, `current_user = authenticated` e o lançamento da
+  outra casa continua invisível: a RLS segue sendo a segunda parede na geração.
 - o backfill depende do **role**, não da policy: rodado como `postgres`
   (`rolbypassrls = true`, conferido no catálogo) ele grava as marcas
   `'backfill'`; a mesma instrução rodada como `authenticated` apanha com
