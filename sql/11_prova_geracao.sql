@@ -97,11 +97,14 @@ select 'funcoes' as parte,
 -- A coluna "impressao" é o detector de divergência entre o arquivo SQL e a
 -- função realmente instalada. Anote o md5 do gerar_mes aqui embaixo depois de
 -- aplicar, e confira nas próximas auditorias:
---   gerar_mes do sql/10 (antes do bloco 11): 0619f9ab536a4d80c0a1c7ea32a3e3cc
---   gerar_mes do sql/11 (com o on conflict):  <anote depois de aplicar>
--- Numa réplica local em PostgreSQL 16 o sql/11 deu
--- baa0fc265c328a164282a4f08a201f14; o banco de produção é PostgreSQL 17 e pode
--- formatar a definição de outro jeito, então o valor que vale é o daqui.
+--   gerar_mes  do sql/10 (antes do bloco 11):  0619f9ab536a4d80c0a1c7ea32a3e3cc
+-- Medidos em produção em 06/09/2026, logo depois de aplicar o sql/11:
+--   public.gerar_mes                           baa0fc265c328a164282a4f08a201f14
+--   public.garantir_mes                        3ee4e02a741ccc148bcb664c525880b6
+--   privado.marcar_mes_corrente                5e49d036b33a3c736dbe983bef4b64a3
+-- O do gerar_mes bateu com o da réplica local em PostgreSQL 16, então o
+-- PostgreSQL 17 formata a definição do mesmo jeito. Se algum desses três mudar
+-- sem que o arquivo SQL tenha mudado, a função instalada divergiu do repositório.
 
 -- ---------- medição 6: o backfill marcou o que devia ----------
 select 'backfill' as parte,
