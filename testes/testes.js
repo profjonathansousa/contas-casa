@@ -665,5 +665,52 @@ medir('continua chamando gerar_mes', LOG.rpcs[rpc19].nome, 'gerar_mes');
 medir('para o mes que esta na tela, nao para o corrente',
       LOG.rpcs[rpc19].args.p_competencia, MESANT19);
 
+print('\n== 20. historico derivado dos lancamentos ==');
+var gerarAntesHist = LOG.rpcs.filter(function (r) { return r.nome === 'gerar_mes'; }).length;
+var garantirAntesHist = LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length;
+var rpcAntesHist = LOG.rpcs.length;
+q('#btn-historico').disparar('click');
+esperar();
+medir('abriu a tela de historico', q('#tela-historico').hidden, false);
+medir('chamou a RPC historico', LOG.rpcs.length - rpcAntesHist, 1);
+medir('RPC sem casa_id', LOG.rpcs[LOG.rpcs.length - 1].args === undefined, true);
+medir('nao chamou gerar_mes', LOG.rpcs[LOG.rpcs.length - 1].nome, 'historico');
+
+var histCards = q('#hist-lista').filhos.filter(function (f) {
+  return f.className.indexOf('hist-mes') === 0;
+});
+medir('dois meses desenhados', histCards.length, 2);
+var rotuloMaisRecente = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
+  .format(new Date(MESHOJE + 'T12:00:00'));
+rotuloMaisRecente = rotuloMaisRecente.charAt(0).toUpperCase() + rotuloMaisRecente.slice(1);
+medir('mais recente primeiro', histCards[0].filhos[0]._txt, rotuloMaisRecente);
+medir('resumo do mes atual', histCards[0].filhos[1]._txt,
+      'Previsto R$ 2.025,30 | Pago R$ 129,90 | A pagar R$ 1.895,40');
+medir('contagem de contas', histCards[0].filhos[2]._txt, '5 contas');
+
+print('  -- reabrir busca os dados atuais, sem snapshot --');
+var rpcAntesHist2 = LOG.rpcs.length;
+HISTORICO[1].pago = 987.65;
+q('#btn-historico').disparar('click');
+esperar();
+medir('reabriu e buscou de novo', LOG.rpcs.length - rpcAntesHist2, 1);
+medir('dado antigo atualizado', q('#hist-lista').filhos[1].filhos[1]._txt,
+      'Previsto R$ 1.000,00 | Pago R$ 987,65 | A pagar R$ 900,00');
+HISTORICO[1].pago = 100.00;
+
+print('  -- tocar num mes reusa a tela mensal existente --');
+var selectsAntesDoToque = LOG.selects.length;
+q('#hist-lista').filhos[0].disparar('click');
+esperar();
+medir('fechou o historico', q('#tela-historico').hidden, true);
+medir('mostrou a tela do mes', q('#tela-mes').hidden, false);
+medir('abriu a competencia correta', LOG.selects[selectsAntesDoToque].comp, MESHOJE);
+medir('historico nao chamou gerar_mes',
+      LOG.rpcs.filter(function (r) { return r.nome === 'gerar_mes'; }).length,
+      gerarAntesHist);
+medir('historico nao chamou garantir_mes',
+      LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length,
+      garantirAntesHist);
+
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

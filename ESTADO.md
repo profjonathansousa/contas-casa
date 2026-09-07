@@ -1,17 +1,19 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 06/09/2026 — bloco 11 (geração automática do mês) **no ar**:
-`sql/11` aplicado no banco e provado em produção. Blocos 1 a 11 NO AR.
+Atualizado em 07/09/2026 — bloco 11 em produção e bloco 13 aplicado/provado
+em produção. Blocos 1 a 13 concluídos.
 
 ## ESTADO ATUAL
 
 ### O que está de pé
 
-- Blocos **1 a 10** concluídos e no ar.
+- Blocos **1 a 13** concluídos.
 - Bloco **11** (o mês corrente nasce sozinho ao abrir o app) **no ar**:
   `sql/11_geracao_automatica.sql` aplicado em 06/09/2026, provado em produção,
   e o app mesclado depois disso.
-- Bancada verde em **170 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bloco **13** (histórico) **em produção**: `sql/13_historico.sql` aplicado e
+  `sql/13_prova_historico.sql` aprovado em 07/09/2026.
+- Bancada verde em **185 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.
@@ -50,6 +52,7 @@ A terceira coluna é a que quase sempre falta.
 | **contas que acabam (parcelas)** | sim (bloco 9) | sim | **sim — confirmado por Jonathan em 05/09; 3 contas fixas já parceladas no banco** |
 | **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — no ar, mas nenhum código colado ainda** |
 | **o mês corrente nasce sozinho** | sim (bloco 11) | sim (bancada 170/4/27/49 com dois controles negativos + réplica local, inclusive concorrência com duas sessões) | **parcialmente — `sql/11` aplicado e provado em produção em 06/09; falta um aparelho de verdade abrir o app num mês novo** |
+| **histórico derivado** | sim (bloco 13) | sim (bancada + prova SQL) | **sim — aplicado e provado no banco; UI publicada ainda pendente** |
 | **trocar e recuperar a senha** | sim (bloco 10) | sim (os controles estão no placar atual) | **não — ainda não exercitado num aparelho depois do bloco 10** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
@@ -90,14 +93,12 @@ porquê de cada resposta. Em resumo:
 
 **Bloco 13 — histórico**
 
-- `lancamento.competencia` já é suficiente para a primeira versão; não é
-  preciso criar tabela nova.
-- Recomendação de arquitetura: função RPC `historico()` em SQL, `security
-  invoker`, agrupando por competência, para que o Postgres/REST devolva a
-  agregação sob a RLS. Alternativa aceitável para o volume atual: buscar os
-  lançamentos da casa e agregar no cliente, mas a RPC é mais simples e barata.
-- A primeira tela lista apenas meses que possuem lançamento; tocar num mês
-  chama a tela mensal existente.
+- Implementado e em produção. `public.historico()` é `security invoker`, sem
+  `casa_id`, agrupa `lancamento` por `competencia` e devolve `previsto`,
+  `pago`, `a_pagar`, `contas` e `sem_valor`.
+- A tela lista os meses da competência mais recente para a mais antiga e
+  reusa a tela mensal ao tocar.
+- Não existe tabela `historico` nem snapshot.
 
 **Bloco 14 — receitas**
 
@@ -154,13 +155,11 @@ porquê de cada resposta. Em resumo:
 ## ROADMAP
 
 ```text
-13 → 14 → 12          (o 11 saiu da fila: implementado em 06/09)
+14 → 12
 ```
 
 | bloco | entrega |
 |---|---|
-| ~~**11**~~ | ~~geração automática do mês~~ — feito, aguardando `sql/11` e merge |
-| **13** | histórico: meses, previsto, pago, a pagar, número de contas |
 | **14** | receitas em tabela separada `receita` |
 | **12** | gráficos, só depois que histórico e receitas estiverem estáveis |
 
@@ -180,7 +179,7 @@ sobre agregações que depois mudam.
    dela — pré-requisito humano dos avisos por pessoa.
 4. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
    ou no mecanismo de `postgres_changes`.
-5. Depois dessas pendências humanas, seguir o roadmap **13 → 14 → 12**,
+5. Depois dessas pendências humanas, seguir o roadmap **14 → 12**,
    em blocos pequenos, com auditoria antes e depois e com a bancada verde.
 
 ## HISTÓRICO TÉCNICO

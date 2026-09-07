@@ -132,6 +132,15 @@ button { border: 0; background: none; cursor: pointer; }
 }
 .gerar:active { opacity: .75; }
 .fx-explica { margin: 6px 2px 0; font-size: 13.5px; line-height: 1.35; opacity: .8; }
+.hist-mes {
+  display: block; width: 100%; text-align: left;
+  background: var(--papel); border: 1px solid var(--borda);
+  border-radius: var(--raio); padding: 12px 13px; margin-bottom: 8px;
+}
+.hist-mes:active { background: var(--borda); }
+.hist-mes-titulo { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.hist-mes-resumo { font-size: 14px; color: var(--fraco); margin-top: 4px; }
+.hist-mes-contas { font-size: 13px; color: var(--fraco); margin-top: 2px; }
 
 /* conta fixa desligada: continua legível, mas claramente fora do ar */
 .item.desligado { opacity: .45; }

@@ -134,6 +134,16 @@ var BANCO = [
 BANCO[4].parcela_n = 5;
 BANCO[4].parcela_de = 12;
 
+var MES_ANTERIOR = (function () {
+  var p = MES.split('-');
+  var d = new Date(+p[0], +p[1] - 2, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+})();
+var HISTORICO = [
+  { competencia: MES,          previsto: 2025.30, pago: 129.90, a_pagar: 1895.40, contas: 5, sem_valor: 2 },
+  { competencia: MES_ANTERIOR, previsto: 1000.00, pago: 100.00, a_pagar: 900.00,  contas: 3, sem_valor: 1 }
+];
+
 function thenable(valor) {
   var o = {
     eq: function (col, v) { o._eq = o._eq || {}; o._eq[col] = v; return o; },
@@ -184,6 +194,7 @@ var supabase = {
                               criadas:     RESPOSTA_GARANTIR.criadas }], error: null };
           }
           if (nome === 'gerar_mes') return { data: 1, error: null };
+          if (nome === 'historico') return { data: HISTORICO, error: null };
           return { data: MODELOS.length, error: null };
         });
       },

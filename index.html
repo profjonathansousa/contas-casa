@@ -58,6 +58,7 @@
       <button type="button" id="pref-20h" class="pref"></button>
     </div>
     <div class="links">
+      <button id="btn-historico" class="sair">histórico</button>
       <button id="btn-fixas" class="sair">contas fixas</button>
       <button id="btn-senha" class="sair">trocar senha</button>
       <button id="btn-sair" class="sair">sair</button>
@@ -66,6 +67,20 @@
 
   <button id="btn-add" class="fab" aria-label="Adicionar conta">+</button>
 </main>
+
+<!-- ---------- histórico ---------- -->
+<section id="tela-historico" class="tela" hidden>
+  <header class="topo">
+    <div class="linha-mes">
+      <button id="hist-voltar" class="seta" aria-label="Voltar">&lsaquo;</button>
+      <span class="nome-mes">Histórico</span>
+      <span class="seta" aria-hidden="true"></span>
+    </div>
+    <p class="fx-explica">Meses com contas lançadas. Toque em um mês para abri-lo.</p>
+  </header>
+
+  <div id="hist-lista" class="lista"></div>
+</section>
 
 <!-- ---------- contas fixas ---------- -->
 <section id="tela-fixas" class="tela" hidden>

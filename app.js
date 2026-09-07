@@ -22,6 +22,8 @@ var el = {
   fundoApagar: $('#fundo-apagar'), folhaApagar: $('#folha-apagar'),
   apDesc: $('#ap-desc'), apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar'),
   adTitulo: $('#ad-titulo'), btnGerar: $('#btn-gerar'), btnFixas: $('#btn-fixas'),
+  btnHistorico: $('#btn-historico'), historico: $('#tela-historico'),
+  histLista: $('#hist-lista'), histVoltar: $('#hist-voltar'),
   fixas: $('#tela-fixas'), fxLista: $('#fx-lista'), fxVoltar: $('#fx-voltar'),
   fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes'), btnAvisos: $('#btn-avisos'),
   prefAvisos: $('#pref-avisos'), prefVespera: $('#pref-vespera'),
@@ -54,6 +56,7 @@ var paraApagar = null;      // item aguardando confirmação de exclusão
 var tipoApagar = 'lancamento';
 var modoFolha = 'lancamento';   // a folha de "+" serve às duas telas
 var modelos = [];               // contas fixas
+var historico = [];             // resumo derivado no banco
 var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo,parcelas_total,parcela_1,pix_estatico';
 var COLUNAS_PERFIL = 'id, casa_id, nome, avisa_vespera_20h, avisa_dia_12h, avisa_dia_20h';
 
@@ -870,6 +873,7 @@ el.btnGerar.addEventListener('click', async function () {
 function mostrarTela(nome) {
   el.mes.hidden = nome !== 'mes';
   el.fixas.hidden = nome !== 'fixas';
+  el.historico.hidden = nome !== 'historico';
 }
 el.btnFixas.addEventListener('click', async function () {
   mostrarTela('fixas');
@@ -877,6 +881,63 @@ el.btnFixas.addEventListener('click', async function () {
   desenharFixas();
 });
 el.fxVoltar.addEventListener('click', function () {
+  mostrarTela('mes');
+  desenhar();
+});
+
+async function carregarHistorico() {
+  var r = await db.rpc('historico');
+  if (r.error) { aviso('Não consegui carregar o histórico. ' + r.error.message); return; }
+  historico = r.data || [];
+  desenharHistorico();
+}
+
+function desenharHistorico() {
+  el.histLista.textContent = '';
+  if (historico.length === 0) {
+    var vazio = document.createElement('p');
+    vazio.className = 'vazio-mes';
+    vazio.textContent = 'Nenhum mês lançado ainda.';
+    el.histLista.appendChild(vazio);
+    return;
+  }
+
+  historico.forEach(function (h) {
+    var botao = document.createElement('button');
+    botao.type = 'button';
+    botao.className = 'hist-mes';
+
+    var titulo = document.createElement('div');
+    titulo.className = 'hist-mes-titulo';
+    var rotulo = fmtMes.format(comoData(h.competencia));
+    titulo.textContent = rotulo.charAt(0).toUpperCase() + rotulo.slice(1);
+
+    var resumo = document.createElement('div');
+    resumo.className = 'hist-mes-resumo';
+    resumo.textContent = 'Previsto R$ ' + reais(h.previsto)
+      + ' | Pago R$ ' + reais(h.pago)
+      + ' | A pagar R$ ' + reais(h.a_pagar);
+
+    var contas = document.createElement('div');
+    contas.className = 'hist-mes-contas';
+    contas.textContent = (h.contas === 1 ? '1 conta' : h.contas + ' contas');
+
+    botao.appendChild(titulo);
+    botao.appendChild(resumo);
+    botao.appendChild(contas);
+    botao.addEventListener('click', function () {
+      mostrarTela('mes');
+      irPara(h.competencia);
+    });
+    el.histLista.appendChild(botao);
+  });
+}
+
+el.btnHistorico.addEventListener('click', async function () {
+  mostrarTela('historico');
+  await carregarHistorico();
+});
+el.histVoltar.addEventListener('click', function () {
   mostrarTela('mes');
   desenhar();
 });

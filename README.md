@@ -139,7 +139,7 @@ iPhone, porque o app instalado não enxerga a sessão do Safari.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
 onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 170 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 185 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -207,12 +207,15 @@ cliente.
 
 ## Estado atual
 
-Os blocos **1 a 11** estão concluídos e no ar. O `sql/11` foi aplicado no
-banco em 06/09/2026 e provado ali mesmo. A bancada fecha em
-`170 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+Os blocos **1 a 13** estão concluídos. O `sql/11` foi aplicado no banco em
+06/09/2026 e provado ali mesmo. O `sql/13` foi aplicado em produção em
+07/09/2026 e a prova SQL passou. A bancada fecha em
+`185 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
   recuperação de senha) estão implementados e no ar.
+- Bloco **13** (histórico) está em produção: `historico()` deriva os meses de
+  `lancamento.competencia`.
 - **Realtime entre dois aparelhos** foi validado manualmente: a mudança feita
   num aparelho aparece no outro praticamente imediatamente. A bancada cobre o
   lado local; a validação manual cobre a travessia da rede.
@@ -224,15 +227,13 @@ banco em 06/09/2026 e provado ali mesmo. A bancada fecha em
 Os próximos blocos são, nesta ordem:
 
 ```text
-13 → 14 → 12
+14 → 12
 ```
 
 | bloco | entrega | observação |
 |---|---|---|
-| ~~**11**~~ | ~~geração automática do mês~~ | no ar desde 06/09/2026 |
-| **13** | histórico | listar meses, previsto, pago, a pagar e número de contas |
-| **14** | receitas | nova tabela `receita`, separada de `lancamento` |
-| **12** | gráficos | só depois de histórico e receitas estabilizados |
+| **14** | receitas | próximo bloco; nova tabela `receita`, separada de `lancamento` |
+| **12** | gráficos | depois das receitas, sobre o modelo financeiro estabilizado |
 
 As decisões de desenho de “Parcelar” direto no lançamento e da UX do código de
 pagamento estão registradas em `ESTADO.md`, nas seções **ESTADO ATUAL** e
