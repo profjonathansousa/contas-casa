@@ -19,7 +19,7 @@ esperar();
 
 print('\n== 1. abriu no mes corrente e pediu so esse mes ==');
 var MESHOJE = (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';})();
-medir('selects feitos', LOG.selects.length, 2);      // modelo + lancamento
+medir('selects feitos', LOG.selects.length, 3);      // modelo + lancamento + receita
 medir('primeiro foi o das fixas', LOG.selects[0].tabela, 'modelo');
 medir('competencia pedida', LOG.selects[1].comp, MESHOJE);
 medir('tela de login escondida', q('#tela-login').hidden, true);
@@ -711,6 +711,109 @@ medir('historico nao chamou gerar_mes',
 medir('historico nao chamou garantir_mes',
       LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length,
       garantirAntesHist);
+
+print('\n== 21. receitas separadas das despesas ==');
+function receitasDesenhadas() {
+  return q('#lista-receitas').filhos.filter(function (f) {
+    return f.className.indexOf('item') === 0;
+  });
+}
+function receitaAtual(d) {
+  return receitasDesenhadas().filter(function (i) {
+    return i.filhos[1].filhos[0]._txt === d;
+  })[0];
+}
+medir('seção de receitas visível', q('#receitas').hidden, false);
+medir('duas receitas desenhadas', receitasDesenhadas().length, 2);
+medir('primeira receita é Salário', receitasDesenhadas()[0].filhos[1].filhos[0]._txt, 'Salário');
+medir('resumo de receitas', q('#receitas-resumo')._txt,
+      'Recebido R$ 5.000,00 · A receber R$ 120,50 · 2 receitas');
+var seloReceita = null;
+(function busca(el){ if (el.className==='selo') seloReceita = el._txt; el.filhos.forEach(busca); })(receitaAtual('Salário'));
+medir('recebida tem selo', /^recebido por Marina, \d\d:\d\d$/.test(seloReceita || ''), true);
+medir('a receber tem estado', receitaAtual('Venda de usados').filhos[1].filhos
+  .filter(function (f) { return f.className === 'receita-estado'; })[0]._txt, 'a receber');
+
+print('\n  -- Realtime: um canal, duas assinaturas --');
+var canalRec = LOG.canais[LOG.canais.length - 1];
+medir('canal atual tem duas assinaturas', canalRec.inscricoes.length, 2);
+medir('assinatura de receita aponta para receita', canalRec.inscricoes[1].cfg.table, 'receita');
+medir('filtro da receita', canalRec.inscricoes[1].cfg.filter,
+      'casa_id=eq.cccccccc-0000-0000-0000-000000000003');
+var nReceitas = receitasDesenhadas().length;
+canalRec.inscricoes[1].fn({ eventType: 'UPDATE', new: {
+  id: 'zzz-rec', competencia: '1999-01-01', descricao: 'De outro mes',
+  valor: 10, recebido: false, recebido_em: null, recebido_por: null } });
+medir('receita de outro mês NAO entrou', receitasDesenhadas().length, nReceitas);
+
+print('\n  -- tocar marca/desmarca recebido --');
+var upReceita = LOG.updates.length;
+receitaAtual('Venda de usados').disparar('click');
+medir('marcou na hora', receitaAtual('Venda de usados').className.indexOf('recebido') > 0, true);
+esperar();
+medir('tabela', LOG.updates[upReceita].tabela, 'receita');
+medir('campos no update', LOG.updates[upReceita].campos, ['recebido']);
+medir('valor enviado', LOG.updates[upReceita].valores.recebido, true);
+receitaAtual('Venda de usados').disparar('click');
+esperar();
+medir('desmarcou', LOG.updates[upReceita + 1].valores.recebido, false);
+medir('voltou a a receber', receitaAtual('Venda de usados').className.indexOf('recebido') > 0, false);
+
+print('\n  -- editar valor de receita --');
+var upValorRec = LOG.updates.length;
+var botaoValorRec = receitaAtual('Venda de usados').filhos[2];
+botaoValorRec.disparar('click');
+var campoValorRec = receitaAtual('Venda de usados').filhos[2];
+campoValorRec.value = '150,00';
+campoValorRec.disparar('blur');
+esperar();
+medir('tabela da edição', LOG.updates[upValorRec].tabela, 'receita');
+medir('campo editado', LOG.updates[upValorRec].campos, ['valor']);
+medir('número interpretado', LOG.updates[upValorRec].valores.valor, 150);
+
+print('\n  -- apagar receita exige confirmação --');
+var antesDelRec = LOG.deletes.length;
+var alvoRec = receitaAtual('Venda de usados');
+alvoRec.disparar('pointerdown');
+avancarTempo(700);
+medir('pediu confirmação', q('#folha-apagar').hidden, false);
+medir('diz qual receita', q('#ap-desc')._txt, 'Venda de usados');
+q('#ap-confirmar').disparar('click');
+esperar();
+medir('apagou na tabela certa', LOG.deletes[antesDelRec].tabela, 'receita');
+medir('id certo', LOG.deletes[antesDelRec].id, 'r2');
+medir('sumiu da lista de receitas', receitasDesenhadas().length, 1);
+
+print('\n  -- criar receita --');
+var antesInsRec = LOG.inserts.length;
+q('#btn-add-receita').disparar('click');
+medir('folha de receita abriu', q('#folha-add').hidden, false);
+medir('título da folha', q('#ad-titulo')._txt, 'Nova receita');
+medir('campo de dia escondido', q('#campo-dia').hidden, true);
+medir('rótulo do valor', q('#rotulo-ad-valor')._txt, 'Valor');
+q('#ad-desc').value = 'Freela';
+q('#ad-valor').value = '300,00';
+q('#folha-add').disparar('submit');
+esperar();
+medir('insert de receita feito', LOG.inserts.length - antesInsRec, 1);
+medir('campos do insert', Object.keys(LOG.inserts[antesInsRec]).sort(),
+      ['casa_id','competencia','descricao','valor']);
+medir('competência da receita', LOG.inserts[antesInsRec].competencia, MESHOJE);
+medir('entrou na lista', receitasDesenhadas().length, 2);
+
+print('\n  -- Realtime: evento de receita da competência atual --');
+var nRecAntesEvento = receitasDesenhadas().length;
+canalRec.inscricoes[1].fn({ eventType: 'INSERT', new: {
+  id: 'r3', competencia: MESHOJE, descricao: 'Reembolso', valor: 80.00,
+  recebido: false, recebido_em: null, recebido_por: null } });
+medir('receita atual entrou pelo Realtime', receitasDesenhadas().length, nRecAntesEvento + 1);
+medir('nova receita aparece', !!receitaAtual('Reembolso'), true);
+
+print('\n  -- logout limpa o cache de receitas --');
+var chaveReceitas = 'receitas:' + CASA + ':' + MESHOJE;
+q('#btn-sair').disparar('click');
+esperar();
+medir('cache de receitas limpo', localStorage.getItem(chaveReceitas), null);
 
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

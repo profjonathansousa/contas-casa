@@ -130,6 +130,19 @@ var BANCO = [
   lanc('l5', 'Cartao azul', 15, null, false)
 ];
 
+function receita(id, desc, valor, recebido) {
+  return { id: id, competencia: MES, descricao: desc, valor: valor,
+           recebido: !!recebido,
+           recebido_em: recebido ? '2026-08-31T12:00:00.000Z' : null,
+           recebido_por: recebido ? ID_OUTRO : null };
+}
+
+// Receitas do mês. Ficam fora de BANCO de propósito: são outra tabela.
+var RECEITAS = [
+  receita('r1', 'Salário', 5000.00, true),
+  receita('r2', 'Venda de usados', 120.50, false)
+];
+
 // Cartao azul e a parcela 5 de 12 do mesmo acordo, ja no mes.
 BANCO[4].parcela_n = 5;
 BANCO[4].parcela_de = 12;
@@ -142,6 +155,11 @@ var MES_ANTERIOR = (function () {
 var HISTORICO = [
   { competencia: MES,          previsto: 2025.30, pago: 129.90, a_pagar: 1895.40, contas: 5, sem_valor: 2 },
   { competencia: MES_ANTERIOR, previsto: 1000.00, pago: 100.00, a_pagar: 900.00,  contas: 3, sem_valor: 1 }
+];
+
+var RECEITAS_MENSAIS = [
+  { competencia: MES,          total: 5120.50, recebido: 5000.00, a_receber: 120.50, contas: 2 },
+  { competencia: MES_ANTERIOR, total: 850.00,  recebido: 850.00,  a_receber: 0.00,   contas: 1 }
 ];
 
 function thenable(valor) {
@@ -173,7 +191,12 @@ var supabase = {
         signOut: function () { return Promise.resolve({}); }
       },
       channel: function (nome) {
-        var c = { nome: nome, on: function (t, cfg, fn) { c.cfg = cfg; c.fn = fn; return c; },
+        var c = { nome: nome, inscricoes: [],
+                  on: function (t, cfg, fn) {
+                    c.inscricoes.push({ tipo: t, cfg: cfg, fn: fn });
+                    if (!c.cfg) { c.cfg = cfg; c.fn = fn; }
+                    return c;
+                  },
                   subscribe: function () { LOG.canais.push(c); return c; } };
         return c;
       },
@@ -195,6 +218,7 @@ var supabase = {
           }
           if (nome === 'gerar_mes') return { data: 1, error: null };
           if (nome === 'historico') return { data: HISTORICO, error: null };
+          if (nome === 'receitas_mensais') return { data: RECEITAS_MENSAIS, error: null };
           return { data: MODELOS.length, error: null };
         });
       },
@@ -212,6 +236,15 @@ var supabase = {
                 return { data: MODELOS.map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }),
                          error: null };
               }
+              if (tabela === 'receita') {
+                LOG.selects.push({ tabela: 'receita', comp: t._eq && t._eq.competencia });
+                return {
+                  data: RECEITAS.filter(function (x) {
+                    return !t._eq || !t._eq.competencia || x.competencia === t._eq.competencia;
+                  }).map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }),
+                  error: null
+                };
+              }
               LOG.selects.push({ tabela: tabela, comp: t._eq && t._eq.competencia });
               return { data: BANCO.map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }), error: null };
             });
@@ -222,6 +255,14 @@ var supabase = {
             LOG.updates.push(reg);
             var t = thenable(function () {
               reg.id = t._eq && t._eq.id;
+              if (tabela === 'receita') {
+                var baseR = RECEITAS.filter(function (x) { return x.id === reg.id; })[0] || RECEITAS[0];
+                var dr = {}; for (var kr in baseR) dr[kr] = baseR[kr];
+                for (var kr2 in obj) dr[kr2] = obj[kr2];
+                if (obj.recebido === true) { dr.recebido_em = new Date().toISOString(); dr.recebido_por = ID_EU; }
+                if (obj.recebido === false) { dr.recebido_em = null; dr.recebido_por = null; }
+                return { data: dr, error: null };
+              }
               var base = BANCO.filter(function (x) { return x.id === reg.id; })[0] || BANCO[0];
               var d = {}; for (var k in base) d[k] = base[k];
               for (var k2 in obj) d[k2] = obj[k2];
@@ -234,13 +275,23 @@ var supabase = {
           'delete': function () {
             var reg = { tabela: tabela };
             LOG.deletes.push(reg);
-            var t = thenable(function () { reg.id = t._eq && t._eq.id; return { error: null }; });
+            var t = thenable(function () {
+              reg.id = t._eq && t._eq.id;
+              return { error: null };
+            });
             return t;
           },
           insert: function (obj) {
             LOG.inserts.push(obj);
             return thenable(function () {
               var d = {}; for (var k in obj) d[k] = obj[k];
+              if (tabela === 'receita') {
+                d.id = 'rnovo';
+                d.recebido = false;
+                d.recebido_em = null;
+                d.recebido_por = null;
+                return { data: d, error: null };
+              }
               d.id = 'novo'; d.vencimento = MES.slice(0,8) + String(obj.dia_vencimento).padStart(2,'0');
               d.pago = false; d.pago_em = null; d.pago_por = null; d.valor_pago = null;
               return { data: d, error: null };

@@ -36,7 +36,11 @@ CONTAS_CASA/
 │   ├── 09_parcelas.sql        contas que acabam: 12 vezes a partir de tal mês
 │   ├── 10_codigo_pagamento.sql  código de barras e PIX guardados no lançamento
 │   ├── 11_geracao_automatica.sql  mes_gerado + garantir_mes(): o mês nasce sozinho
-│   └── 11_prova_geracao.sql   prova do bloco 11 (trava, índice, RLS, backfill)
+│   ├── 11_prova_geracao.sql   prova do bloco 11 (trava, índice, RLS, backfill)
+│   ├── 13_historico.sql       histórico derivado de lancamento.competencia
+│   ├── 13_prova_historico.sql prova do histórico
+│   ├── 14_receitas.sql        receitas: tabela, RLS, trigger e resumo mensal
+│   └── 14_prova_receitas.sql  prova do bloco 14
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -139,7 +143,7 @@ iPhone, porque o app instalado não enxerga a sessão do Safari.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
 onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 185 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 220 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -169,6 +173,11 @@ mês), `descricao`, `dia_vencimento` (int), `vencimento` (date),
 `pago` (bool), `pago_em`, `pago_por`, `observacao`, `parcela_n`, `parcela_de`,
 `codigo_pagamento`, `codigo_tipo`, `criado_em`, `atualizado_em`.
 
+**receita** — `id`, `casa_id`, `competencia` (date, sempre dia 1),
+`descricao`, `valor` (numeric, obrigatório e não negativo), `recebido`,
+`recebido_em`, `recebido_por`, `observacao`, `criado_em`, `atualizado_em`.
+É uma tabela separada de `lancamento`: receita não é despesa negativa.
+
 **modelo** — `id`, `casa_id`, `descricao`, `dia_vencimento`, `valor_padrao`
 (anulável), `ativo`, `parcelas_total`, `parcela_1`, `pix_estatico`,
 `criado_em`, `atualizado_em`.
@@ -195,7 +204,7 @@ cliente.
 ## Segurança
 
 - RLS ligado e forçado nas tabelas de dados da casa (`casa`, `perfil`,
-  `lancamento`, `modelo`, `push_inscricao`, `aviso_enviado`), isolando por
+  `lancamento`, `receita`, `modelo`, `push_inscricao`, `aviso_enviado`), isolando por
   `casa_id` — e por pessoa, no caso das inscrições e das preferências de aviso.
 - No frontend só a `anon key`, que é pública por desenho — quem protege os
   dados é a RLS, não o segredo da chave.
@@ -207,15 +216,18 @@ cliente.
 
 ## Estado atual
 
-Os blocos **1 a 13** estão concluídos. O `sql/11` foi aplicado no banco em
+Os blocos **1 a 14** estão concluídos. O `sql/11` foi aplicado no banco em
 06/09/2026 e provado ali mesmo. O `sql/13` foi aplicado em produção em
-07/09/2026 e a prova SQL passou. A bancada fecha em
-`185 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+07/09/2026 e a prova SQL passou. O `sql/14` também foi aplicado e provado em
+produção. A bancada fecha em
+`220 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
   recuperação de senha) estão implementados e no ar.
 - Bloco **13** (histórico) está em produção: `historico()` deriva os meses de
   `lancamento.competencia`.
+- Bloco **14** (receitas) está implementado e provado no banco: `receita` é
+  uma tabela separada, e `receitas_mensais()` resume cada competência.
 - **Realtime entre dois aparelhos** foi validado manualmente: a mudança feita
   num aparelho aparece no outro praticamente imediatamente. A bancada cobre o
   lado local; a validação manual cobre a travessia da rede.
@@ -224,16 +236,17 @@ Os blocos **1 a 13** estão concluídos. O `sql/11` foi aplicado no banco em
 
 ## Roadmap
 
-Os próximos blocos são, nesta ordem:
+O roadmap segue nesta ordem:
 
 ```text
-14 → 12
+14 → 15 → 12
 ```
 
 | bloco | entrega | observação |
 |---|---|---|
-| **14** | receitas | próximo bloco; nova tabela `receita`, separada de `lancamento` |
-| **12** | gráficos | depois das receitas, sobre o modelo financeiro estabilizado |
+| **14** | receitas | concluído; nova tabela `receita`, separada de `lancamento` |
+| **15** | histórico legado | próximo bloco; fora do escopo do Bloco 14 |
+| **12** | gráficos | depois do histórico legado e do modelo financeiro estabilizado |
 
 As decisões de desenho de “Parcelar” direto no lançamento e da UX do código de
 pagamento estão registradas em `ESTADO.md`, nas seções **ESTADO ATUAL** e

@@ -18,12 +18,15 @@ var el = {
   lista: $('#lista'), btnAdd: $('#btn-add'), btnSair: $('#btn-sair'),
   fundoAdd: $('#fundo-add'), folhaAdd: $('#folha-add'), adDesc: $('#ad-desc'),
   adDia: $('#ad-dia'), adValor: $('#ad-valor'), adCancelar: $('#ad-cancelar'),
+  campoDia: $('#campo-dia'), rotuloAdValor: $('#rotulo-ad-valor'),
   erroAdd: $('#erro-add'), aviso: $('#aviso'),
   fundoApagar: $('#fundo-apagar'), folhaApagar: $('#folha-apagar'),
   apDesc: $('#ap-desc'), apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar'),
   adTitulo: $('#ad-titulo'), btnGerar: $('#btn-gerar'), btnFixas: $('#btn-fixas'),
   btnHistorico: $('#btn-historico'), historico: $('#tela-historico'),
   histLista: $('#hist-lista'), histVoltar: $('#hist-voltar'),
+  btnAddReceita: $('#btn-add-receita'), receitasLista: $('#lista-receitas'),
+  receitasResumo: $('#receitas-resumo'),
   fixas: $('#tela-fixas'), fxLista: $('#fx-lista'), fxVoltar: $('#fx-voltar'),
   fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes'), btnAvisos: $('#btn-avisos'),
   prefAvisos: $('#pref-avisos'), prefVespera: $('#pref-vespera'),
@@ -44,6 +47,9 @@ var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
               'valor_previsto,valor_pago,pago,pago_em,pago_por,' +
               'parcela_n,parcela_de,codigo_pagamento,codigo_tipo';
 
+var COLUNAS_RECEITA = 'id,casa_id,competencia,descricao,valor,' +
+                      'recebido,recebido_em,recebido_por,observacao';
+
 var eu = null;        // { id, casa_id, nome }
 var nomes = {};       // id do perfil -> primeiro nome
 var comp = mesDeHoje();
@@ -57,6 +63,7 @@ var tipoApagar = 'lancamento';
 var modoFolha = 'lancamento';   // a folha de "+" serve às duas telas
 var modelos = [];               // contas fixas
 var historico = [];             // resumo derivado no banco
+var receitas = [];              // receitas do mês, separadas das despesas
 var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo,parcelas_total,parcela_1,pix_estatico';
 var COLUNAS_PERFIL = 'id, casa_id, nome, avisa_vespera_20h, avisa_dia_12h, avisa_dia_20h';
 
@@ -307,17 +314,28 @@ function cacheGravar() {
 function cacheLer() {
   try { return JSON.parse(localStorage.getItem(chaveCache()) || 'null'); } catch (e) { return null; }
 }
+function chaveCacheReceitas() { return 'receitas:' + (eu ? eu.casa_id : '?') + ':' + comp; }
+function cacheGravarReceitas() {
+  try { localStorage.setItem(chaveCacheReceitas(), JSON.stringify(receitas)); } catch (e) {}
+}
+function cacheLerReceitas() {
+  try { return JSON.parse(localStorage.getItem(chaveCacheReceitas()) || 'null'); } catch (e) { return null; }
+}
 // Sair tem que levar o dinheiro embora: o cache de pintura guarda descrição e
-// valor das contas, e sem isto eles ficavam no aparelho depois do logout.
+// valor das contas e das receitas, e sem isto eles ficavam no aparelho depois
+// do logout.
 function cacheApagar() {
   try {
     if (typeof localStorage.length === 'number' && typeof localStorage.key === 'function') {
       for (var i = localStorage.length - 1; i >= 0; i--) {
         var k = localStorage.key(i);
-        if (k && k.indexOf('mes:') === 0) localStorage.removeItem(k);
+        if (k && (k.indexOf('mes:') === 0 || k.indexOf('receitas:') === 0)) {
+          localStorage.removeItem(k);
+        }
       }
     } else {
       localStorage.removeItem(chaveCache());
+      localStorage.removeItem(chaveCacheReceitas());
     }
   } catch (e) {}
 }
@@ -421,14 +439,32 @@ async function carregarPerfis() {
 
 async function carregarMes() {
   var doCache = cacheLer();
-  if (doCache) { itens = doCache; desenhar(); }
+  var doCacheReceitas = cacheLerReceitas();
+  if (doCache) { itens = doCache; }
+  if (doCacheReceitas) { receitas = doCacheReceitas; }
+  if (doCache || doCacheReceitas) { desenhar(); }
+
   var r = await db.from('lancamento').select(COLUNAS)
     .eq('competencia', comp)
     .order('dia_vencimento', { ascending: true })
     .order('descricao', { ascending: true });
-  if (r.error) { aviso('Não consegui carregar o mês. ' + r.error.message); return; }
-  itens = r.data;
-  cacheGravar();
+  if (r.error) {
+    aviso('Não consegui carregar o mês. ' + r.error.message);
+  } else {
+    itens = r.data;
+    cacheGravar();
+  }
+
+  var rr = await db.from('receita').select(COLUNAS_RECEITA)
+    .eq('competencia', comp)
+    .order('descricao', { ascending: true });
+  if (rr.error) {
+    aviso('Não consegui carregar as receitas. ' + rr.error.message);
+  } else {
+    receitas = rr.data;
+    cacheGravarReceitas();
+  }
+
   desenhar();
 }
 
@@ -459,6 +495,10 @@ function ligarTempoReal() {
         { event: '*', schema: 'public', table: 'lancamento',
           filter: 'casa_id=eq.' + eu.casa_id },
         aplicarDeFora)
+    .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'receita',
+          filter: 'casa_id=eq.' + eu.casa_id },
+        aplicarReceitaDeFora)
     .subscribe();
 }
 
@@ -478,6 +518,26 @@ function aplicarDeFora(msg) {
     return a.dia_vencimento - b.dia_vencimento || a.descricao.localeCompare(b.descricao, 'pt-BR');
   });
   cacheGravar();
+  desenhar();
+}
+
+function aplicarReceitaDeFora(msg) {
+  var novo = msg.new, velho = msg.old;
+  var some = function (id) {
+    var antes = receitas.length;
+    receitas = receitas.filter(function (r) { return r.id !== id; });
+    if (receitas.length !== antes) { cacheGravarReceitas(); desenhar(); }
+  };
+  if (msg.eventType === 'DELETE') { if (velho && velho.id) some(velho.id); return; }
+  if (!novo || !novo.id) return;
+  if (novo.competencia !== comp) { some(novo.id); return; }
+
+  var i = receitas.findIndex(function (x) { return x.id === novo.id; });
+  if (i >= 0) receitas[i] = novo; else receitas.push(novo);
+  receitas.sort(function (a, b) {
+    return a.descricao.localeCompare(b.descricao, 'pt-BR');
+  });
+  cacheGravarReceitas();
   desenhar();
 }
 
@@ -518,19 +578,163 @@ function desenhar() {
     vazio.className = 'vazio-mes';
     vazio.textContent = 'Nenhuma conta neste mês. Toque no + para adicionar.';
     el.lista.appendChild(vazio);
+  } else {
+    var diaAtual = null;
+    itens.forEach(function (it) {
+      if (it.vencimento !== diaAtual) {
+        diaAtual = it.vencimento;
+        var h = document.createElement('div');
+        h.className = 'dia';
+        h.textContent = ddmm(it.vencimento);
+        el.lista.appendChild(h);
+      }
+      el.lista.appendChild(linha(it));
+    });
+  }
+
+  desenharReceitas();
+}
+
+function receitasDoMes() {
+  return receitas.filter(function (r) { return r.competencia === comp; });
+}
+
+function desenharReceitas() {
+  var doMes = receitasDoMes();
+  var total = 0, recebido = 0, aReceber = 0;
+  doMes.forEach(function (r) {
+    total += Number(r.valor);
+    if (r.recebido) recebido += Number(r.valor); else aReceber += Number(r.valor);
+  });
+
+  el.receitasResumo.textContent = 'Recebido R$ ' + reais(recebido)
+    + ' · A receber R$ ' + reais(aReceber)
+    + ' · ' + (doMes.length === 1 ? '1 receita' : doMes.length + ' receitas');
+
+  el.receitasLista.textContent = '';
+  if (doMes.length === 0) {
+    var vazio = document.createElement('p');
+    vazio.className = 'vazio-mes';
+    vazio.textContent = 'Nenhuma receita neste mês.';
+    el.receitasLista.appendChild(vazio);
     return;
   }
 
-  var diaAtual = null;
-  itens.forEach(function (it) {
-    if (it.vencimento !== diaAtual) {
-      diaAtual = it.vencimento;
-      var h = document.createElement('div');
-      h.className = 'dia';
-      h.textContent = ddmm(it.vencimento);
-      el.lista.appendChild(h);
+  doMes.forEach(function (r) { el.receitasLista.appendChild(linhaReceita(r)); });
+}
+
+function linhaReceita(it) {
+  var div = document.createElement('div');
+  div.className = 'item receita' + (it.recebido ? ' recebido' : '');
+
+  var marca = document.createElement('div');
+  marca.className = 'marca';
+  marca.textContent = it.recebido ? '✓' : '';
+
+  var corpo = document.createElement('div');
+  corpo.className = 'corpo';
+  var desc = document.createElement('div');
+  desc.className = 'desc';
+  desc.textContent = it.descricao;
+  corpo.appendChild(desc);
+
+  if (it.recebido && it.recebido_em) {
+    var selo = document.createElement('div');
+    selo.className = 'selo';
+    var quem = nomes[it.recebido_por];
+    selo.textContent = 'recebido por ' + (quem || 'alguém') + ', ' + hhmm(it.recebido_em);
+    corpo.appendChild(selo);
+  } else {
+    var estado = document.createElement('div');
+    estado.className = 'receita-estado';
+    estado.textContent = 'a receber';
+    corpo.appendChild(estado);
+  }
+
+  var valor = document.createElement('button');
+  valor.type = 'button';
+  valor.className = 'valor';
+  valor.innerHTML = '<i>R$</i> ' + reais(it.valor);
+  valor.setAttribute('aria-label', 'Editar valor de ' + it.descricao);
+  valor.addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    editarValorReceita(it, valor);
+  });
+  valor.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+
+  ligarToques(div, function () { alternarRecebido(it); },
+                   function () { pedirApagar(it, 'receita'); });
+
+  div.appendChild(marca);
+  div.appendChild(corpo);
+  div.appendChild(valor);
+  return div;
+}
+
+async function alternarRecebido(it) {
+  var antes = { recebido: it.recebido, recebido_em: it.recebido_em,
+                recebido_por: it.recebido_por };
+  it.recebido = !it.recebido;
+  it.recebido_em = it.recebido ? new Date().toISOString() : null;
+  it.recebido_por = it.recebido ? eu.id : null;
+  desenhar();
+  if (navigator.vibrate) navigator.vibrate(8);
+
+  var r = await db.from('receita').update({ recebido: it.recebido })
+            .eq('id', it.id).select(COLUNAS_RECEITA).single();
+  if (r.error) {
+    it.recebido = antes.recebido;
+    it.recebido_em = antes.recebido_em;
+    it.recebido_por = antes.recebido_por;
+    desenhar();
+    aviso('Não deu para salvar. ' + r.error.message);
+    return;
+  }
+  Object.keys(r.data).forEach(function (k) { it[k] = r.data[k]; });
+  cacheGravarReceitas();
+  desenhar();
+}
+
+function editarValorReceita(it, botao) {
+  editando = true;
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.inputMode = 'decimal';
+  inp.className = 'editando';
+  inp.value = reais(it.valor);
+  botao.replaceWith(inp);
+  inp.focus();
+  inp.select();
+
+  var terminou = false;
+  function fechar() {
+    editando = false;
+    if (renderPendente) { renderPendente = false; }
+    desenhar();
+  }
+  async function salvar() {
+    if (terminou) return;
+    terminou = true;
+    var n = paraNumero(inp.value);
+    if (typeof n === 'number' && isNaN(n)) { aviso('Não entendi esse valor.'); fechar(); return; }
+    if (n === null) { aviso('A receita precisa de um valor.'); fechar(); return; }
+    if (n === it.valor) { fechar(); return; }
+    var antes = it.valor;
+    it.valor = n;
+    fechar();
+    var r = await db.from('receita').update({ valor: n }).eq('id', it.id);
+    if (r.error) {
+      it.valor = antes;
+      desenhar();
+      aviso('Não deu para salvar. ' + r.error.message);
+    } else {
+      cacheGravarReceitas();
     }
-    el.lista.appendChild(linha(it));
+  }
+  inp.addEventListener('blur', salvar);
+  inp.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); inp.blur(); }
+    if (ev.key === 'Escape') { terminou = true; fechar(); }
   });
 }
 
@@ -817,6 +1021,21 @@ el.apConfirmar.addEventListener('click', async function () {
     desenharFixas();
     var rm = await db.from('modelo').delete().eq('id', it.id);
     if (rm.error) { modelos = guardaM; desenharFixas(); aviso('Não deu para apagar. ' + rm.error.message); }
+    return;
+  }
+
+  if (tipo === 'receita') {
+    var guardaR = receitas.slice();
+    receitas = receitas.filter(function (x) { return x.id !== it.id; });
+    desenhar();
+    var rr = await db.from('receita').delete().eq('id', it.id);
+    if (rr.error) {
+      receitas = guardaR;
+      desenhar();
+      aviso('Não deu para apagar. ' + rr.error.message);
+    } else {
+      cacheGravarReceitas();
+    }
     return;
   }
 
@@ -1238,10 +1457,15 @@ el.mesNome.addEventListener('click', function () {
 
 function abrirFolha(modo) {
   modoFolha = modo || 'lancamento';
-  el.adTitulo.textContent = modoFolha === 'modelo' ? 'Nova conta fixa' : 'Nova conta';
+  el.adTitulo.textContent = modoFolha === 'modelo' ? 'Nova conta fixa'
+                          : modoFolha === 'receita' ? 'Nova receita'
+                          : 'Nova conta';
   el.adDesc.value = '';
   el.adDia.value = '';
   el.adValor.value = '';
+  el.campoDia.hidden = modoFolha === 'receita';
+  el.rotuloAdValor.textContent = modoFolha === 'receita'
+    ? 'Valor' : 'Valor (pode deixar vazio)';
   el.erroAdd.hidden = true;
   el.fundoAdd.hidden = false;
   el.folhaAdd.hidden = false;
@@ -1253,18 +1477,40 @@ function fecharFolha() {
 }
 el.btnAdd.addEventListener('click', function () { abrirFolha('lancamento'); });
 el.fxAdd.addEventListener('click', function () { abrirFolha('modelo'); });
+el.btnAddReceita.addEventListener('click', function () { abrirFolha('receita'); });
 el.adCancelar.addEventListener('click', fecharFolha);
 el.fundoAdd.addEventListener('click', fecharFolha);
 
 el.folhaAdd.addEventListener('submit', async function (ev) {
   ev.preventDefault();
   var desc = el.adDesc.value.trim();
-  var dia = parseInt(el.adDia.value, 10);
   var val = paraNumero(el.adValor.value);
   el.erroAdd.hidden = true;
   if (!desc) { el.erroAdd.textContent = 'Falta a descrição.'; el.erroAdd.hidden = false; return; }
-  if (!(dia >= 1 && dia <= 31)) { el.erroAdd.textContent = 'O dia tem que ser entre 1 e 31.'; el.erroAdd.hidden = false; return; }
   if (typeof val === 'number' && isNaN(val)) { el.erroAdd.textContent = 'Não entendi esse valor.'; el.erroAdd.hidden = false; return; }
+
+  if (modoFolha === 'receita') {
+    if (val === null) {
+      el.erroAdd.textContent = 'A receita precisa de um valor.';
+      el.erroAdd.hidden = false;
+      return;
+    }
+    var rr = await db.from('receita').insert({
+      casa_id: eu.casa_id, competencia: comp, descricao: desc, valor: val
+    }).select(COLUNAS_RECEITA).single();
+    if (rr.error) { el.erroAdd.textContent = rr.error.message; el.erroAdd.hidden = false; return; }
+    fecharFolha();
+    if (!receitas.some(function (x) { return x.id === rr.data.id; })) receitas.push(rr.data);
+    receitas.sort(function (a, b) {
+      return a.descricao.localeCompare(b.descricao, 'pt-BR');
+    });
+    cacheGravarReceitas();
+    desenhar();
+    return;
+  }
+
+  var dia = parseInt(el.adDia.value, 10);
+  if (!(dia >= 1 && dia <= 31)) { el.erroAdd.textContent = 'O dia tem que ser entre 1 e 31.'; el.erroAdd.hidden = false; return; }
 
   if (modoFolha === 'modelo') {
     var rm = await db.from('modelo').insert({

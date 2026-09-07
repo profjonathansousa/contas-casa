@@ -1,19 +1,22 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 07/09/2026 — bloco 11 em produção e bloco 13 aplicado/provado
-em produção. Blocos 1 a 13 concluídos.
+Atualizado em 07/09/2026 — blocos 11 e 13 em produção e bloco 14 implementado,
+aplicado e provado no banco. Blocos 1 a 14 concluídos.
 
 ## ESTADO ATUAL
 
 ### O que está de pé
 
-- Blocos **1 a 13** concluídos.
+- Blocos **1 a 14** concluídos.
 - Bloco **11** (o mês corrente nasce sozinho ao abrir o app) **no ar**:
   `sql/11_geracao_automatica.sql` aplicado em 06/09/2026, provado em produção,
   e o app mesclado depois disso.
 - Bloco **13** (histórico) **em produção**: `sql/13_historico.sql` aplicado e
   `sql/13_prova_historico.sql` aprovado em 07/09/2026.
-- Bancada verde em **185 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bloco **14** (receitas) **implementado e provado no banco**:
+  `sql/14_receitas.sql` aplicado e `sql/14_prova_receitas.sql` aprovado em
+  07/09/2026. Ainda não validado num aparelho.
+- Bancada verde em **220 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.
@@ -52,7 +55,8 @@ A terceira coluna é a que quase sempre falta.
 | **contas que acabam (parcelas)** | sim (bloco 9) | sim | **sim — confirmado por Jonathan em 05/09; 3 contas fixas já parceladas no banco** |
 | **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — no ar, mas nenhum código colado ainda** |
 | **o mês corrente nasce sozinho** | sim (bloco 11) | sim (bancada 170/4/27/49 com dois controles negativos + réplica local, inclusive concorrência com duas sessões) | **parcialmente — `sql/11` aplicado e provado em produção em 06/09; falta um aparelho de verdade abrir o app num mês novo** |
-| **histórico derivado** | sim (bloco 13) | sim (bancada + prova SQL) | **sim — aplicado e provado no banco; UI publicada ainda pendente** |
+| **histórico derivado** | sim (bloco 13) | sim (bancada + prova SQL) | **sim — aplicado, provado no banco e publicado no Pages** |
+| **receitas** | sim (bloco 14) | sim (bancada + prova SQL do 14) | **não — aplicado e provado no banco; nenhuma receita real lançada ainda** |
 | **trocar e recuperar a senha** | sim (bloco 10) | sim (os controles estão no placar atual) | **não — ainda não exercitado num aparelho depois do bloco 10** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
@@ -62,6 +66,8 @@ A terceira coluna é a que quase sempre falta.
 2. **Login da segunda pessoa da casa** e inscrição do aparelho dela nos avisos.
 3. **Aviso de véspera / por pessoa** chegando de verdade num aparelho, além do
    aviso único já validado.
+4. **Lançar a primeira receita real** num aparelho e conferir que ela aparece
+   separada das despesas.
 
 O **Realtime entre dois aparelhos** já está validado manualmente; não é uma
 pendência, mas deve ser revalidado em qualquer mudança futura que toque no
@@ -69,8 +75,9 @@ pendência, mas deve ser revalidado em qualquer mudança futura que toque no
 
 ### Decisões registradas nesta auditoria
 
-Nada abaixo está implementado. São decisões de desenho e pontos a auditar
-antes de abrir os blocos 11–14.
+Esta seção preserva as decisões de desenho. Os itens marcados como
+**IMPLEMENTADO** são estado atual; os demais continuam pendentes de auditoria
+ou implementação.
 
 **Bloco 11 — geração automática do mês — IMPLEMENTADO**
 
@@ -100,18 +107,24 @@ porquê de cada resposta. Em resumo:
   reusa a tela mensal ao tocar.
 - Não existe tabela `historico` nem snapshot.
 
-**Bloco 14 — receitas**
+**Bloco 14 — receitas — IMPLEMENTADO**
 
-- Criar `receita` separada, sem generalizar `lancamento`. Campos iniciais
-  sugeridos: `id`, `casa_id`, `competencia`, `descricao`, `valor`, `recebido`,
-  `recebido_em`, `recebido_por`, `observacao`, `criado_em`, `atualizado_em`.
-- Aplicar RLS por `casa_id`, trigger de autoria/hora para `recebido` análogo ao
-  de `lancamento`, e incluir `receita` na publicação Realtime com filtro por
-  casa.
-- A tela mensal passa a ter um canal Realtime para `lancamento` e outro para
-  `receita` (ou um canal com duas assinaturas); não usar a mesma lógica cega.
-- Totais da tela mensal e gráficos (bloco 12) passam a considerar receitas
-  depois do bloco 14.
+- `public.receita` é tabela separada, com `competencia` sempre dia 1, `valor`
+  obrigatório e não negativo, `recebido`, `recebido_em`, `recebido_por`,
+  `observacao`, `criado_em` e `atualizado_em`.
+- RLS ligada e forçada por `casa_id`; `anon` sem acesso; `authenticated` com
+  CRUD.
+- `public.tg_receita()` segue o padrão de `tg_lancamento()`: normaliza a
+  competência, controla timestamps e grava/limpa `recebido_em` e `recebido_por`.
+- Realtime com `replica identity full` e `public.receita` na publicação
+  `supabase_realtime`.
+- `public.receitas_mensais()` é `security invoker`, sem parâmetros, e devolve
+  `competencia`, `total`, `recebido`, `a_receber` e `contas`.
+- Na tela, receitas aparecem numa seção própria do mês, separada das despesas;
+  o canal Realtime continua único, agora com duas assinaturas
+  (`lancamento` e `receita`).
+- `public.historico()` continua exclusivamente despesas. Não existe tabela
+  `historico` nem snapshot.
 
 **Bloco 12 — gráficos**
 
@@ -155,13 +168,14 @@ porquê de cada resposta. Em resumo:
 ## ROADMAP
 
 ```text
-14 → 12
+14 → 15 → 12
 ```
 
 | bloco | entrega |
 |---|---|
-| **14** | receitas em tabela separada `receita` |
-| **12** | gráficos, só depois que histórico e receitas estiverem estáveis |
+| **14** | receitas em tabela separada `receita` — concluído |
+| **15** | histórico legado — próximo bloco; ainda não implementado |
+| **12** | gráficos, depois do histórico legado e do modelo financeiro estabilizado |
 
 Gráficos ficam por último de propósito: devem ser construídos sobre um modelo
 financeiro já estável, com histórico e receitas definidos, para não nascerem
@@ -179,8 +193,10 @@ sobre agregações que depois mudam.
    dela — pré-requisito humano dos avisos por pessoa.
 4. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
    ou no mecanismo de `postgres_changes`.
-5. Depois dessas pendências humanas, seguir o roadmap **14 → 12**,
-   em blocos pequenos, com auditoria antes e depois e com a bancada verde.
+5. **Auditar o Bloco 14** antes de abrir o Bloco 15.
+6. Depois das pendências humanas e da auditoria do Bloco 14, seguir o roadmap
+   **14 → 15 → 12**, em blocos pequenos, com auditoria antes e depois e com a
+   bancada verde.
 
 ## HISTÓRICO TÉCNICO
 

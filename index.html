@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
 <link rel="icon" href="icones/icone-192.png">
-<link rel="stylesheet" href="app.css?v=10">
+<link rel="stylesheet" href="app.css?v=11">
 </head>
 <body>
 
@@ -49,6 +49,16 @@
 
   <button id="btn-gerar" class="gerar" hidden></button>
   <div id="lista" class="lista"></div>
+
+  <section id="receitas" class="receitas">
+    <div class="receitas-cab">
+      <h2>Receitas</h2>
+      <button id="btn-add-receita" class="receita-add">+ receita</button>
+    </div>
+    <p id="receitas-resumo" class="receitas-resumo"></p>
+    <div id="lista-receitas" class="lista"></div>
+  </section>
+
   <footer class="rodape">
     <p class="dica">Segure uma conta para apagar.</p>
     <button id="btn-avisos" class="avisos" hidden></button>
@@ -111,12 +121,12 @@
   <label for="ad-desc">Descrição</label>
   <input id="ad-desc" type="text" enterkeyhint="next" autocapitalize="sentences" required>
   <div class="dupla">
-    <div>
+    <div id="campo-dia">
       <label for="ad-dia">Vence dia</label>
       <input id="ad-dia" type="number" inputmode="numeric" min="1" max="31" required>
     </div>
     <div>
-      <label for="ad-valor">Valor <small>(pode deixar vazio)</small></label>
+      <label id="rotulo-ad-valor" for="ad-valor">Valor</label>
       <input id="ad-valor" type="text" inputmode="decimal" placeholder="???">
     </div>
   </div>
@@ -206,6 +216,6 @@
 
 <script src="vendor/supabase.js"></script>
 <script src="config.js?v=10"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

@@ -142,6 +142,63 @@ button { border: 0; background: none; cursor: pointer; }
 .hist-mes-resumo { font-size: 14px; color: var(--fraco); margin-top: 4px; }
 .hist-mes-contas { font-size: 13px; color: var(--fraco); margin-top: 2px; }
 
+/* receitas: vivem na mesma tela do mês, mas separadas das despesas */
+.receitas {
+  margin: 14px 10px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--borda);
+}
+.receitas-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 2px 2px;
+}
+.receitas-cab h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.receita-add {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--papel);
+  border: 1px solid var(--borda);
+  color: var(--texto);
+  font-size: 14px;
+  font-weight: 600;
+}
+.receita-add:active { opacity: .6; }
+.receitas-resumo {
+  margin: 4px 2px 8px;
+  color: var(--fraco);
+  font-size: 14px;
+}
+.item.receita {
+  border-left: 3px solid var(--pago);
+}
+.item.receita.recebido {
+  background: var(--pago-fundo);
+  border-color: transparent;
+  border-left-color: var(--pago);
+}
+.item.receita.recebido .marca {
+  background: var(--pago);
+  border-color: var(--pago);
+}
+.item.receita.recebido .desc {
+  color: var(--fraco);
+}
+.item.receita.recebido .valor {
+  color: var(--fraco);
+}
+.receita-estado {
+  font-size: 13px;
+  color: var(--fraco);
+  margin-top: 2px;
+}
+
 /* conta fixa desligada: continua legível, mas claramente fora do ar */
 .item.desligado { opacity: .45; }
 .item.desligado .marca { border-style: dashed; }
