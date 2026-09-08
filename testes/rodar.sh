@@ -8,7 +8,7 @@
 # quebrada, que é pior do que não ter CI.
 set -e
 
-ESPERADO='220 / 4 / 27 / 49'
+ESPERADO='230 / 4 / 27 / 49'
 
 AQUI=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP=$(CDPATH= cd -- "$AQUI/.." && pwd)

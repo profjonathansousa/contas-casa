@@ -27,6 +27,7 @@ var el = {
   histLista: $('#hist-lista'), histVoltar: $('#hist-voltar'),
   btnAddReceita: $('#btn-add-receita'), receitasLista: $('#lista-receitas'),
   receitasResumo: $('#receitas-resumo'),
+  legadoLista: $('#lista-legado'), legadoResumo: $('#legado-resumo'),
   fixas: $('#tela-fixas'), fxLista: $('#fx-lista'), fxVoltar: $('#fx-voltar'),
   fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes'), btnAvisos: $('#btn-avisos'),
   prefAvisos: $('#pref-avisos'), prefVespera: $('#pref-vespera'),
@@ -50,6 +51,12 @@ var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
 var COLUNAS_RECEITA = 'id,casa_id,competencia,descricao,valor,' +
                       'recebido,recebido_em,recebido_por,observacao';
 
+var COLUNAS_LEGADO = 'id,competencia,dia,descricao,valor,pago,riscado,' +
+                     'observacao,parcela_n,parcela_de,ordem_original';
+var COLUNAS_LEGADO_RECEITA = 'id,competencia,dia,descricao,valor,recebido,' +
+                             'observacao,ordem_original';
+var COLUNAS_LEGADO_RESUMO = 'id,competencia,secao,texto,valor,ordem_original';
+
 var eu = null;        // { id, casa_id, nome }
 var nomes = {};       // id do perfil -> primeiro nome
 var comp = mesDeHoje();
@@ -64,6 +71,9 @@ var modoFolha = 'lancamento';   // a folha de "+" serve às duas telas
 var modelos = [];               // contas fixas
 var historico = [];             // resumo derivado no banco
 var receitas = [];              // receitas do mês, separadas das despesas
+var legado = [];                // despesas do histórico legado
+var legadoReceitas = [];        // receitas do histórico legado
+var legadoResumos = [];         // totais/resumos do histórico legado
 var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo,parcelas_total,parcela_1,pix_estatico';
 var COLUNAS_PERFIL = 'id, casa_id, nome, avisa_vespera_20h, avisa_dia_12h, avisa_dia_20h';
 
@@ -321,6 +331,17 @@ function cacheGravarReceitas() {
 function cacheLerReceitas() {
   try { return JSON.parse(localStorage.getItem(chaveCacheReceitas()) || 'null'); } catch (e) { return null; }
 }
+function chaveCacheLegado() { return 'legado:' + (eu ? eu.casa_id : '?') + ':' + comp; }
+function cacheGravarLegado() {
+  try {
+    localStorage.setItem(chaveCacheLegado(), JSON.stringify({
+      despesas: legado, receitas: legadoReceitas, resumos: legadoResumos
+    }));
+  } catch (e) {}
+}
+function cacheLerLegado() {
+  try { return JSON.parse(localStorage.getItem(chaveCacheLegado()) || 'null'); } catch (e) { return null; }
+}
 // Sair tem que levar o dinheiro embora: o cache de pintura guarda descrição e
 // valor das contas e das receitas, e sem isto eles ficavam no aparelho depois
 // do logout.
@@ -329,13 +350,15 @@ function cacheApagar() {
     if (typeof localStorage.length === 'number' && typeof localStorage.key === 'function') {
       for (var i = localStorage.length - 1; i >= 0; i--) {
         var k = localStorage.key(i);
-        if (k && (k.indexOf('mes:') === 0 || k.indexOf('receitas:') === 0)) {
+        if (k && (k.indexOf('mes:') === 0 || k.indexOf('receitas:') === 0 ||
+                  k.indexOf('legado:') === 0)) {
           localStorage.removeItem(k);
         }
       }
     } else {
       localStorage.removeItem(chaveCache());
       localStorage.removeItem(chaveCacheReceitas());
+      localStorage.removeItem(chaveCacheLegado());
     }
   } catch (e) {}
 }
@@ -440,9 +463,15 @@ async function carregarPerfis() {
 async function carregarMes() {
   var doCache = cacheLer();
   var doCacheReceitas = cacheLerReceitas();
+  var doCacheLegado = cacheLerLegado();
   if (doCache) { itens = doCache; }
   if (doCacheReceitas) { receitas = doCacheReceitas; }
-  if (doCache || doCacheReceitas) { desenhar(); }
+  if (doCacheLegado) {
+    legado = doCacheLegado.despesas || [];
+    legadoReceitas = doCacheLegado.receitas || [];
+    legadoResumos = doCacheLegado.resumos || [];
+  }
+  if (doCache || doCacheReceitas || doCacheLegado) { desenhar(); }
 
   var r = await db.from('lancamento').select(COLUNAS)
     .eq('competencia', comp)
@@ -464,6 +493,34 @@ async function carregarMes() {
     receitas = rr.data;
     cacheGravarReceitas();
   }
+
+  var rl = await db.from('historico_legado').select(COLUNAS_LEGADO)
+    .eq('competencia', comp)
+    .order('ordem_original', { ascending: true });
+  if (rl.error) {
+    aviso('Não consegui carregar o histórico legado. ' + rl.error.message);
+  } else {
+    legado = rl.data;
+  }
+
+  var rlr = await db.from('historico_legado_receita').select(COLUNAS_LEGADO_RECEITA)
+    .eq('competencia', comp)
+    .order('ordem_original', { ascending: true });
+  if (rlr.error) {
+    aviso('Não consegui carregar as receitas do histórico legado. ' + rlr.error.message);
+  } else {
+    legadoReceitas = rlr.data;
+  }
+
+  var rls = await db.from('historico_legado_resumo').select(COLUNAS_LEGADO_RESUMO)
+    .eq('competencia', comp)
+    .order('ordem_original', { ascending: true });
+  if (rls.error) {
+    aviso('Não consegui carregar os resumos do histórico legado. ' + rls.error.message);
+  } else {
+    legadoResumos = rls.data;
+  }
+  cacheGravarLegado();
 
   desenhar();
 }
@@ -593,6 +650,7 @@ function desenhar() {
   }
 
   desenharReceitas();
+  desenharLegado();
 }
 
 function receitasDoMes() {
@@ -621,6 +679,118 @@ function desenharReceitas() {
   }
 
   doMes.forEach(function (r) { el.receitasLista.appendChild(linhaReceita(r)); });
+}
+
+function legadoDoMes(lista) {
+  return lista.filter(function (x) { return x.competencia === comp; });
+}
+
+function desenharLegado() {
+  var despesas = legadoDoMes(legado);
+  var receitasLegado = legadoDoMes(legadoReceitas);
+  var resumos = legadoDoMes(legadoResumos);
+
+  var partes = [];
+  if (despesas.length) partes.push(despesas.length === 1 ? '1 despesa histórica'
+                                    : despesas.length + ' despesas históricas');
+  if (receitasLegado.length) partes.push(receitasLegado.length === 1 ? '1 receita histórica'
+                                    : receitasLegado.length + ' receitas históricas');
+  el.legadoResumo.textContent = partes.length
+    ? partes.join(' · ') : 'Nenhum registro legado neste mês.';
+
+  el.legadoLista.textContent = '';
+
+  if (despesas.length) {
+    var tituloDespesas = document.createElement('div');
+    tituloDespesas.className = 'legado-grupo';
+    tituloDespesas.textContent = 'Despesas históricas';
+    el.legadoLista.appendChild(tituloDespesas);
+    despesas.forEach(function (it) { el.legadoLista.appendChild(linhaLegadoDespesa(it)); });
+  }
+
+  if (receitasLegado.length) {
+    var tituloReceitas = document.createElement('div');
+    tituloReceitas.className = 'legado-grupo';
+    tituloReceitas.textContent = 'Receitas históricas';
+    el.legadoLista.appendChild(tituloReceitas);
+    receitasLegado.forEach(function (it) { el.legadoLista.appendChild(linhaLegadoReceita(it)); });
+  }
+
+  if (resumos.length) {
+    var tituloResumos = document.createElement('div');
+    tituloResumos.className = 'legado-grupo';
+    tituloResumos.textContent = 'Resumos';
+    el.legadoLista.appendChild(tituloResumos);
+    resumos.forEach(function (it) {
+      var p = document.createElement('p');
+      p.className = 'legado-resumo-linha';
+      p.textContent = it.texto + (it.valor != null ? ' — R$ ' + reais(it.valor) : '');
+      el.legadoLista.appendChild(p);
+    });
+  }
+
+  if (!despesas.length && !receitasLegado.length && !resumos.length) {
+    var vazio = document.createElement('p');
+    vazio.className = 'vazio-mes';
+    vazio.textContent = 'Nenhum registro legado neste mês.';
+    el.legadoLista.appendChild(vazio);
+  }
+}
+
+function linhaLegadoDespesa(it) {
+  var div = document.createElement('div');
+  div.className = 'item legado' + (it.riscado ? ' riscado' : '') + (it.pago ? ' pago' : '');
+
+  var marca = document.createElement('div');
+  marca.className = 'marca';
+  marca.textContent = it.pago ? '✓' : '';
+
+  var corpo = document.createElement('div');
+  corpo.className = 'corpo';
+  var desc = document.createElement('div');
+  desc.className = 'desc';
+  desc.textContent = it.descricao;
+  corpo.appendChild(desc);
+  if (it.observacao) {
+    var obs = document.createElement('div');
+    obs.className = 'legado-obs';
+    obs.textContent = it.observacao;
+    corpo.appendChild(obs);
+  }
+
+  var valor = document.createElement('div');
+  valor.className = 'valor';
+  valor.innerHTML = it.valor == null ? '???' : '<i>R$</i> ' + reais(it.valor);
+
+  div.appendChild(marca);
+  div.appendChild(corpo);
+  div.appendChild(valor);
+  return div;
+}
+
+function linhaLegadoReceita(it) {
+  var div = document.createElement('div');
+  div.className = 'item legado receita';
+
+  var marca = document.createElement('div');
+  marca.className = 'marca';
+  marca.textContent = it.recebido ? '✓' : '';
+
+  var corpo = document.createElement('div');
+  corpo.className = 'corpo';
+  var desc = document.createElement('div');
+  desc.className = 'desc';
+  desc.textContent = it.descricao;
+  corpo.appendChild(desc);
+
+  var valor = document.createElement('div');
+  valor.className = 'valor';
+  valor.innerHTML = it.valor == null ? '???' : '<i>R$</i> ' + reais(it.valor);
+
+  div.appendChild(marca);
+  div.appendChild(corpo);
+  div.appendChild(valor);
+  return div;
 }
 
 function linhaReceita(it) {

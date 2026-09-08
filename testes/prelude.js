@@ -162,6 +162,24 @@ var RECEITAS_MENSAIS = [
   { competencia: MES_ANTERIOR, total: 850.00,  recebido: 850.00,  a_receber: 0.00,   contas: 1 }
 ];
 
+// Histórico legado: somente leitura, separado de lancamento/modelo/receita.
+var LEGADO = [
+  { id: 'lg1', competencia: MES, dia: 5, descricao: 'Despesa legada paga',
+    valor: 100.00, pago: true, riscado: false, observacao: null,
+    ordem_original: 1 },
+  { id: 'lg2', competencia: MES, dia: 8, descricao: 'Despesa legada riscada',
+    valor: 50.00, pago: false, riscado: true, observacao: 'cancelada',
+    ordem_original: 2 }
+];
+var LEGADO_RECEITAS = [
+  { id: 'lgr1', competencia: MES, dia: null, descricao: 'Entrada legada',
+    valor: 200.00, recebido: true, observacao: null, ordem_original: 1 }
+];
+var LEGADO_RESUMOS = [
+  { id: 'lgs1', competencia: MES, secao: 'total_despesas',
+    texto: 'Total legado', valor: 150.00, ordem_original: 1 }
+];
+
 function thenable(valor) {
   var o = {
     eq: function (col, v) { o._eq = o._eq || {}; o._eq[col] = v; return o; },
@@ -240,6 +258,33 @@ var supabase = {
                 LOG.selects.push({ tabela: 'receita', comp: t._eq && t._eq.competencia });
                 return {
                   data: RECEITAS.filter(function (x) {
+                    return !t._eq || !t._eq.competencia || x.competencia === t._eq.competencia;
+                  }).map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }),
+                  error: null
+                };
+              }
+              if (tabela === 'historico_legado') {
+                LOG.selects.push({ tabela: 'historico_legado', comp: t._eq && t._eq.competencia });
+                return {
+                  data: LEGADO.filter(function (x) {
+                    return !t._eq || !t._eq.competencia || x.competencia === t._eq.competencia;
+                  }).map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }),
+                  error: null
+                };
+              }
+              if (tabela === 'historico_legado_receita') {
+                LOG.selects.push({ tabela: 'historico_legado_receita', comp: t._eq && t._eq.competencia });
+                return {
+                  data: LEGADO_RECEITAS.filter(function (x) {
+                    return !t._eq || !t._eq.competencia || x.competencia === t._eq.competencia;
+                  }).map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }),
+                  error: null
+                };
+              }
+              if (tabela === 'historico_legado_resumo') {
+                LOG.selects.push({ tabela: 'historico_legado_resumo', comp: t._eq && t._eq.competencia });
+                return {
+                  data: LEGADO_RESUMOS.filter(function (x) {
                     return !t._eq || !t._eq.competencia || x.competencia === t._eq.competencia;
                   }).map(function (x) { var c = {}; for (var k in x) c[k] = x[k]; return c; }),
                   error: null

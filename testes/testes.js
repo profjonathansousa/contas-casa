@@ -19,7 +19,7 @@ esperar();
 
 print('\n== 1. abriu no mes corrente e pediu so esse mes ==');
 var MESHOJE = (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';})();
-medir('selects feitos', LOG.selects.length, 3);      // modelo + lancamento + receita
+medir('selects feitos', LOG.selects.length, 6);      // modelo + lancamento + receita + legado
 medir('primeiro foi o das fixas', LOG.selects[0].tabela, 'modelo');
 medir('competencia pedida', LOG.selects[1].comp, MESHOJE);
 medir('tela de login escondida', q('#tela-login').hidden, true);
@@ -712,7 +712,38 @@ medir('historico nao chamou garantir_mes',
       LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length,
       garantirAntesHist);
 
-print('\n== 21. receitas separadas das despesas ==');
+print('\n== 21. historico legado separado da operacao corrente ==');
+function legadoDesenhados() {
+  return q('#lista-legado').filhos.filter(function (f) {
+    return f.className.indexOf('item') === 0;
+  });
+}
+medir('seção de histórico legado visível', q('#legado').hidden, false);
+medir('resumo do legado', q('#legado-resumo')._txt,
+      '2 despesas históricas · 1 receita histórica');
+medir('despesas legadas desenhadas', legadoDesenhados().length, 3);
+medir('despesa paga legada', legadoDesenhados()[0].filhos[1].filhos[0]._txt,
+      'Despesa legada paga');
+medir('despesa riscada legada tem riscado',
+      legadoDesenhados()[1].className.indexOf('riscado') > 0, true);
+medir('receita legada separada', legadoDesenhados()[2].filhos[1].filhos[0]._txt,
+      'Entrada legada');
+medir('resumo legado aparece', textoDe(q('#lista-legado'))
+      .indexOf('Total legado') >= 0, true);
+
+print('  -- navegar entre meses continua leitura, sem geração --');
+var gerarAntesLegado = LOG.rpcs.filter(function (r) { return r.nome === 'gerar_mes'; }).length;
+var garantirAntesLegado = LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length;
+q('#mes-prox').disparar('click'); esperar();
+q('#mes-ant').disparar('click'); esperar();
+medir('navegação legada não chamou gerar_mes',
+      LOG.rpcs.filter(function (r) { return r.nome === 'gerar_mes'; }).length,
+      gerarAntesLegado);
+medir('navegação legada não chamou garantir_mes',
+      LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length,
+      garantirAntesLegado);
+
+print('\n== 22. receitas separadas das despesas ==');
 function receitasDesenhadas() {
   return q('#lista-receitas').filhos.filter(function (f) {
     return f.className.indexOf('item') === 0;
@@ -811,9 +842,11 @@ medir('nova receita aparece', !!receitaAtual('Reembolso'), true);
 
 print('\n  -- logout limpa o cache de receitas --');
 var chaveReceitas = 'receitas:' + CASA + ':' + MESHOJE;
+var chaveLegado = 'legado:' + CASA + ':' + MESHOJE;
 q('#btn-sair').disparar('click');
 esperar();
 medir('cache de receitas limpo', localStorage.getItem(chaveReceitas), null);
+medir('cache de legado limpo', localStorage.getItem(chaveLegado), null);
 
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

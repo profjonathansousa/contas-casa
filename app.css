@@ -199,6 +199,65 @@ button { border: 0; background: none; cursor: pointer; }
   margin-top: 2px;
 }
 
+/* histórico legado: leitura, separado da operação corrente */
+.legado {
+  margin: 14px 10px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--borda);
+}
+.legado-cab {
+  margin: 0 2px 2px;
+}
+.legado-cab h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.legado-resumo {
+  margin: 4px 2px 8px;
+  color: var(--fraco);
+  font-size: 14px;
+}
+.legado-grupo {
+  margin: 12px 2px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fraco);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.legado-obs {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--fraco);
+}
+.legado-resumo-linha {
+  margin: 4px 2px;
+  color: var(--fraco);
+  font-size: 14px;
+}
+.item.legado.riscado .desc {
+  text-decoration: line-through;
+}
+.item.legado.pago {
+  background: var(--pago-fundo);
+  border-color: transparent;
+}
+.item.legado.pago .marca {
+  background: var(--pago);
+  border-color: var(--pago);
+}
+.item.legado.pago .desc {
+  color: var(--fraco);
+}
+.item.legado.pago .valor {
+  color: var(--fraco);
+}
+.item.legado.receita {
+  border-left: 3px solid var(--pago);
+}
+
 /* conta fixa desligada: continua legível, mas claramente fora do ar */
 .item.desligado { opacity: .45; }
 .item.desligado .marca { border-style: dashed; }
