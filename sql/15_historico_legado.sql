@@ -45,6 +45,10 @@ create table if not exists public.historico_legado (
 create index if not exists historico_legado_casa_comp_idx
   on public.historico_legado (casa_id, competencia, ordem_original);
 
+alter table public.historico_legado add column if not exists lote_id text;
+create unique index if not exists historico_legado_lote_linha_idx
+  on public.historico_legado (casa_id, lote_id, ordem_original);
+
 -- ------------------------------------------------------------
 -- 2. Receitas históricas
 -- ------------------------------------------------------------
@@ -77,6 +81,10 @@ create table if not exists public.historico_legado_receita (
 create index if not exists historico_legado_receita_casa_comp_idx
   on public.historico_legado_receita (casa_id, competencia, ordem_original);
 
+alter table public.historico_legado_receita add column if not exists lote_id text;
+create unique index if not exists historico_legado_receita_lote_linha_idx
+  on public.historico_legado_receita (casa_id, lote_id, ordem_original);
+
 -- ------------------------------------------------------------
 -- 3. Totais, resumos e blocos que não são lançamentos
 -- ------------------------------------------------------------
@@ -106,6 +114,36 @@ create table if not exists public.historico_legado_resumo (
 
 create index if not exists historico_legado_resumo_casa_comp_idx
   on public.historico_legado_resumo (casa_id, competencia, ordem_original);
+
+alter table public.historico_legado_resumo add column if not exists lote_id text;
+create unique index if not exists historico_legado_resumo_lote_linha_idx
+  on public.historico_legado_resumo (casa_id, lote_id, ordem_original);
+
+-- ------------------------------------------------------------
+-- 3b. Lote de importação
+-- ------------------------------------------------------------
+
+create table if not exists public.historico_legado_lote (
+  id            uuid primary key default gen_random_uuid(),
+  casa_id       uuid not null references public.casa(id) on delete cascade,
+  lote_id       text not null,
+  importado_em  timestamptz not null default now(),
+  itens         int not null default 0,
+  origem        text not null default 'legado_markdown',
+
+  unique (casa_id, lote_id)
+);
+
+alter table public.historico_legado_lote enable row level security;
+alter table public.historico_legado_lote force  row level security;
+
+drop policy if exists historico_legado_lote_ler on public.historico_legado_lote;
+create policy historico_legado_lote_ler on public.historico_legado_lote
+  for select to authenticated
+  using (casa_id = public.minha_casa());
+
+revoke all on public.historico_legado_lote from anon, authenticated;
+grant select on public.historico_legado_lote to authenticated;
 
 -- ------------------------------------------------------------
 -- 4. RLS: o app só lê, e só a própria casa
@@ -144,15 +182,19 @@ grant select on public.historico_legado,
                 public.historico_legado_resumo
   to authenticated;
 
--- ------------------------------------------------------------
--- 5. Importador controlado
--- ------------------------------------------------------------
--- Recebe JSONB e grava nas três tabelas. Fica fora do public, sem EXECUTE
--- para anon/authenticated: o carregamento real é feito por um operador com
--- acesso ao banco, nunca pelo app.
+--- ------------------------------------------------------------
+--- 5. Importador controlado
+--- ------------------------------------------------------------
+--- Recebe lote_id + JSONB e grava nas três tabelas. Fica fora do public,
+--- sem EXECUTE para anon/authenticated: o carregamento real é feito por um
+--- operador com acesso ao banco, nunca pelo app.
+--- O par (casa_id, lote_id, ordem_original) é a identidade estável de linha.
+
+drop function if exists privado.importar_historico_legado(uuid, jsonb);
 
 create or replace function privado.importar_historico_legado(
   p_casa_id uuid,
+  p_lote    text,
   p_itens   jsonb
 )
 returns int
@@ -169,8 +211,22 @@ begin
     raise exception 'casa_id é obrigatório';
   end if;
 
+  if p_lote is null or length(btrim(p_lote)) = 0 then
+    raise exception 'lote é obrigatório';
+  end if;
+
   if not exists (select 1 from public.casa where id = p_casa_id) then
     raise exception 'casa não existe';
+  end if;
+
+  insert into public.historico_legado_lote
+    (casa_id, lote_id, importado_em, itens)
+  values
+    (p_casa_id, p_lote, now(), jsonb_array_length(p_itens))
+  on conflict (casa_id, lote_id) do nothing;
+
+  if not found then
+    return 0;
   end if;
 
   for item in select * from jsonb_array_elements(p_itens) loop
@@ -179,10 +235,11 @@ begin
     case item->>'tipo'
       when 'despesa' then
         insert into public.historico_legado
-          (casa_id, competencia, dia, descricao, valor, pago, riscado,
-           observacao, parcela_n, parcela_de, linha_original, ordem_original)
+          (casa_id, lote_id, competencia, dia, descricao, valor, pago,
+           riscado, observacao, parcela_n, parcela_de, linha_original,
+           ordem_original)
         values
-          (p_casa_id, comp,
+          (p_casa_id, p_lote, comp,
            nullif(item->>'dia', '')::int,
            item->>'descricao',
            nullif(item->>'valor', '')::numeric,
@@ -192,33 +249,36 @@ begin
            nullif(item->>'parcela_n', '')::int,
            nullif(item->>'parcela_de', '')::int,
            item->>'linha_original',
-           (item->>'ordem')::int);
+           (item->>'ordem')::int)
+        on conflict (casa_id, lote_id, ordem_original) do nothing;
 
       when 'receita' then
         insert into public.historico_legado_receita
-          (casa_id, competencia, dia, descricao, valor, recebido,
+          (casa_id, lote_id, competencia, dia, descricao, valor, recebido,
            observacao, linha_original, ordem_original)
         values
-          (p_casa_id, comp,
+          (p_casa_id, p_lote, comp,
            nullif(item->>'dia', '')::int,
            item->>'descricao',
            nullif(item->>'valor', '')::numeric,
            coalesce((item->>'recebido')::boolean, true),
            nullif(item->>'observacao', ''),
            item->>'linha_original',
-           (item->>'ordem')::int);
+           (item->>'ordem')::int)
+        on conflict (casa_id, lote_id, ordem_original) do nothing;
 
       when 'resumo' then
         insert into public.historico_legado_resumo
-          (casa_id, competencia, secao, texto, valor, linha_original,
-           ordem_original)
+          (casa_id, lote_id, competencia, secao, texto, valor,
+           linha_original, ordem_original)
         values
-          (p_casa_id, comp,
+          (p_casa_id, p_lote, comp,
            item->>'secao',
            item->>'texto',
            nullif(item->>'valor', '')::numeric,
            item->>'linha_original',
-           (item->>'ordem')::int);
+           (item->>'ordem')::int)
+        on conflict (casa_id, lote_id, ordem_original) do nothing;
 
       else
         raise exception 'tipo desconhecido: %', item->>'tipo';
@@ -231,7 +291,7 @@ begin
 end
 $$;
 
-revoke all on function privado.importar_historico_legado(uuid, jsonb)
+revoke all on function privado.importar_historico_legado(uuid, text, jsonb)
   from public, anon, authenticated;
 
 -- ------------------------------------------------------------
@@ -244,14 +304,15 @@ select c.relname as tabela,
   from pg_class c
  where c.relnamespace = 'public'::regnamespace
    and c.relname in
-     ('historico_legado','historico_legado_receita','historico_legado_resumo')
+     ('historico_legado','historico_legado_receita',
+      'historico_legado_resumo','historico_legado_lote')
  order by c.relname;
 
 select p.proname as funcao,
        p.prosecdef as security_definer,
        pg_get_function_identity_arguments(p.oid) as argumentos,
-       has_function_privilege('anon', 'privado.importar_historico_legado(uuid,jsonb)', 'EXECUTE') as anon_executa,
-       has_function_privilege('authenticated', 'privado.importar_historico_legado(uuid,jsonb)', 'EXECUTE') as auth_executa
+       has_function_privilege('anon', 'privado.importar_historico_legado(uuid,text,jsonb)', 'EXECUTE') as anon_executa,
+       has_function_privilege('authenticated', 'privado.importar_historico_legado(uuid,text,jsonb)', 'EXECUTE') as auth_executa
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'privado'

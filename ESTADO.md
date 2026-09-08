@@ -138,8 +138,10 @@ porquê de cada resposta. Em resumo:
   `public.historico_legado`, `public.historico_legado_receita` e
   `public.historico_legado_resumo`.
 - As três tabelas são somente leitura para o app e têm RLS por `casa_id`.
-- A importação é feita por `privado.importar_historico_legado(uuid, jsonb)`,
-  sem EXECUTE para `anon`/`authenticated`.
+- A importação é feita por `privado.importar_historico_legado(uuid, text, jsonb)`,
+  agora com `lote_id` e sem EXECUTE para `anon`/`authenticated`. A tabela
+  `historico_legado_lote` e o índice `(casa_id, lote_id, ordem_original)`
+  impedem que o mesmo lote seja duplicado.
 - Histórico legado não vira `modelo`, não entra em `lancamento` e não participa
   da geração automática.
 - Na tela, o histórico legado aparece numa seção própria do mês, abaixo das

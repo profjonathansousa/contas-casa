@@ -12,8 +12,9 @@
 select 'tabelas_legado' as parte,
        to_regclass('public.historico_legado') is not null as despesas_existe,
        to_regclass('public.historico_legado_receita') is not null as receitas_existe,
-       to_regclass('public.historico_legado_resumo') is not null as resumos_existe;
--- esperado: t | t | t
+       to_regclass('public.historico_legado_resumo') is not null as resumos_existe,
+       to_regclass('public.historico_legado_lote') is not null as lotes_existe;
+-- esperado: t | t | t | t
 
 select 'rls_legado' as parte,
        c.relname,
@@ -24,7 +25,8 @@ select 'rls_legado' as parte,
   from pg_class c
  where c.relnamespace = 'public'::regnamespace
    and c.relname in
-     ('historico_legado','historico_legado_receita','historico_legado_resumo')
+     ('historico_legado','historico_legado_receita',
+      'historico_legado_resumo','historico_legado_lote')
  order by c.relname;
 -- esperado: só política de leitura em cada tabela.
 
@@ -37,19 +39,20 @@ select 'grants_legado' as parte,
        has_table_privilege('authenticated', t.tabela, 'DELETE') as auth_delete
   from (values ('public.historico_legado'),
                ('public.historico_legado_receita'),
-               ('public.historico_legado_resumo')) as t(tabela);
+               ('public.historico_legado_resumo'),
+               ('public.historico_legado_lote')) as t(tabela);
 -- esperado: anon_select=f, auth_select=t, insert/update/delete=f.
 
 select 'importador_legado' as parte,
        p.prosecdef as security_definer,
        pg_get_function_identity_arguments(p.oid) as argumentos,
-       has_function_privilege('anon', 'privado.importar_historico_legado(uuid,jsonb)', 'EXECUTE') as anon_executa,
-       has_function_privilege('authenticated', 'privado.importar_historico_legado(uuid,jsonb)', 'EXECUTE') as auth_executa
+       has_function_privilege('anon', 'privado.importar_historico_legado(uuid,text,jsonb)', 'EXECUTE') as anon_executa,
+       has_function_privilege('authenticated', 'privado.importar_historico_legado(uuid,text,jsonb)', 'EXECUTE') as auth_executa
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'privado'
    and p.proname = 'importar_historico_legado';
--- esperado: t | p_casa_id uuid, p_itens jsonb | f | f
+-- esperado: t | p_casa_id uuid, p_lote text, p_itens jsonb | f | f
 
 -- ------------------------------------------------------------
 -- 2. Setup de casas e contadores
@@ -82,6 +85,7 @@ select id, 'Casa de prova histórico legado' from _casa_legado_estranha;
 
 select privado.importar_historico_legado(
   (select casa_id from _casa_legado),
+  'lote-a',
   jsonb_build_array(
     jsonb_build_object(
       'tipo','despesa',
@@ -121,7 +125,70 @@ select privado.importar_historico_legado(
 );
 
 select privado.importar_historico_legado(
+  (select casa_id from _casa_legado),
+  'lote-a',
+  jsonb_build_array(
+    jsonb_build_object(
+      'tipo','despesa',
+      'competencia','2026-09-01',
+      'dia',5,
+      'descricao','Despesa legada de prova',
+      'valor',100.00,
+      'pago',true,
+      'riscado',false,
+      'observacao',null,
+      'parcela_n',null,
+      'parcela_de',null,
+      'linha_original','- [x] 100,00 Despesa legada de prova',
+      'ordem',1
+    ),
+    jsonb_build_object(
+      'tipo','receita',
+      'competencia','2026-09-01',
+      'dia',null,
+      'descricao','Receita legada de prova',
+      'valor',200.00,
+      'recebido',true,
+      'observacao',null,
+      'linha_original','200,00 Receita legada de prova',
+      'ordem',2
+    ),
+    jsonb_build_object(
+      'tipo','resumo',
+      'competencia','2026-09-01',
+      'secao','total_despesas',
+      'texto','Total de prova',
+      'valor',300.00,
+      'linha_original','Total: R$ 300,00',
+      'ordem',3
+    )
+  )
+);
+
+select privado.importar_historico_legado(
+  (select casa_id from _casa_legado),
+  'lote-b',
+  jsonb_build_array(
+    jsonb_build_object(
+      'tipo','despesa',
+      'competencia','2026-09-01',
+      'dia',6,
+      'descricao','Despesa do lote diferente',
+      'valor',75.00,
+      'pago',false,
+      'riscado',false,
+      'observacao',null,
+      'parcela_n',null,
+      'parcela_de',null,
+      'linha_original','- [ ] 75,00 Despesa do lote diferente',
+      'ordem',1
+    )
+  )
+);
+
+select privado.importar_historico_legado(
   (select id from _casa_legado_estranha),
+  'lote-outra-casa',
   jsonb_build_array(
     jsonb_build_object(
       'tipo','despesa',
@@ -151,6 +218,17 @@ select 'importado_propria_casa' as parte,
          where casa_id = (select casa_id from _casa_legado)
            and texto = 'Total de prova') as resumos;
 -- esperado: 1 | 1 | 1
+
+select 'idempotencia_lote' as parte,
+       (select count(*) from public.historico_legado
+         where descricao = 'Despesa legada de prova') as lote_a_despesa,
+       (select count(*) from public.historico_legado
+         where descricao = 'Despesa do lote diferente') as lote_b_despesa,
+       (select count(*) from public.historico_legado_lote
+         where lote_id = 'lote-a') as lotes_a,
+       (select count(*) from public.historico_legado_lote
+         where lote_id = 'lote-b') as lotes_b;
+-- esperado: 1 | 1 | 1 | 1
 
 do $$
 declare
@@ -232,7 +310,8 @@ drop table _casa_legado;
 --   3: anon_select=f, auth_select=t, insert/update/delete=f.
 --   4: importador security_definer, anon/auth sem EXECUTE.
 --   5: importado_propria_casa = 1 | 1 | 1.
---   6: nenhuma exception em "não altera tabelas correntes".
---   7: visao_legado_authenticated = 1 | 0 | 1 | 1.
---   8: "ok inserção direta em historico_legado recusada".
+--   6: idempotencia_lote = 1 | 1 | 1 | 1.
+--   7: nenhuma exception em "não altera tabelas correntes".
+--   8: visao_legado_authenticated = 1 | 0 | 1 | 1.
+--   9: "ok inserção direta em historico_legado recusada".
 -- ============================================================

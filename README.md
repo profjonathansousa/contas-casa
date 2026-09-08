@@ -182,8 +182,11 @@ mês), `descricao`, `dia_vencimento` (int), `vencimento` (date),
 
 **histórico legado** — três tabelas somente leitura para o app:
 `historico_legado` (despesas históricas), `historico_legado_receita`
-(receitas históricas) e `historico_legado_resumo` (totais e resumos). O
-histórico antigo nunca vira `modelo` e não participa da geração automática.
+(receitas históricas) e `historico_legado_resumo` (totais e resumos). Há
+também `historico_legado_lote`, que identifica cada importação. O par
+`(casa_id, lote_id, ordem_original)` garante que o mesmo lote não duplique
+registros. O histórico antigo nunca vira `modelo` e não participa da geração
+automática.
 
 **modelo** — `id`, `casa_id`, `descricao`, `dia_vencimento`, `valor_padrao`
 (anulável), `ativo`, `parcelas_total`, `parcela_1`, `pix_estatico`,
