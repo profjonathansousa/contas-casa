@@ -23,6 +23,8 @@ var el = {
   fundoApagar: $('#fundo-apagar'), folhaApagar: $('#folha-apagar'),
   apDesc: $('#ap-desc'), apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar'),
   adTitulo: $('#ad-titulo'), btnGerar: $('#btn-gerar'), btnFixas: $('#btn-fixas'),
+  btnGraficos: $('#btn-graficos'), graficos: $('#tela-graficos'),
+  grafLista: $('#graf-lista'), grafVoltar: $('#graf-voltar'),
   btnHistorico: $('#btn-historico'), historico: $('#tela-historico'),
   histLista: $('#hist-lista'), histVoltar: $('#hist-voltar'),
   btnAddReceita: $('#btn-add-receita'), receitasLista: $('#lista-receitas'),
@@ -74,6 +76,7 @@ var receitas = [];              // receitas do mês, separadas das despesas
 var legado = [];                // despesas do histórico legado
 var legadoReceitas = [];        // receitas do histórico legado
 var legadoResumos = [];         // totais/resumos do histórico legado
+var graficos = [];              // série mensal para os gráficos
 var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo,parcelas_total,parcela_1,pix_estatico';
 var COLUNAS_PERFIL = 'id, casa_id, nome, avisa_vespera_20h, avisa_dia_12h, avisa_dia_20h';
 
@@ -1263,6 +1266,7 @@ function mostrarTela(nome) {
   el.mes.hidden = nome !== 'mes';
   el.fixas.hidden = nome !== 'fixas';
   el.historico.hidden = nome !== 'historico';
+  el.graficos.hidden = nome !== 'graficos';
 }
 el.btnFixas.addEventListener('click', async function () {
   mostrarTela('fixas');
@@ -1327,6 +1331,111 @@ el.btnHistorico.addEventListener('click', async function () {
   await carregarHistorico();
 });
 el.histVoltar.addEventListener('click', function () {
+  mostrarTela('mes');
+  desenhar();
+});
+
+async function carregarGraficos() {
+  var r = await db.rpc('graficos');
+  if (r.error) { aviso('Não consegui carregar os gráficos. ' + r.error.message); return; }
+  graficos = r.data || [];
+  desenharGraficos();
+}
+
+function cartaoGrafico(titulo) {
+  var div = document.createElement('section');
+  div.className = 'graf-cartao';
+  var h = document.createElement('h3');
+  h.textContent = titulo;
+  div.appendChild(h);
+  return div;
+}
+
+function linhaGrafico(rotulo, valor) {
+  var p = document.createElement('p');
+  p.className = 'graf-linha-texto';
+  p.textContent = rotulo + ' R$ ' + reais(valor);
+  return p;
+}
+
+function barraGrafico(rotulo, valor, max, classe) {
+  var linha = document.createElement('div');
+  linha.className = 'graf-linha';
+  var rot = document.createElement('span');
+  rot.className = 'graf-rotulo';
+  rot.textContent = rotulo;
+  var trilho = document.createElement('span');
+  trilho.className = 'graf-trilho';
+  var preenchida = document.createElement('span');
+  preenchida.className = 'graf-preenchida' + (classe ? ' ' + classe : '');
+  var pct = max > 0 ? Math.max(2, Math.round((Number(valor) || 0) / max * 100)) : 0;
+  preenchida.style.width = pct + '%';
+  trilho.appendChild(preenchida);
+  linha.appendChild(rot);
+  linha.appendChild(trilho);
+  return linha;
+}
+
+function desenharGraficos() {
+  el.grafLista.textContent = '';
+  if (graficos.length === 0) {
+    var vazio = document.createElement('p');
+    vazio.className = 'vazio-mes';
+    vazio.textContent = 'Ainda não há despesas nem receitas correntes para exibir.';
+    el.grafLista.appendChild(vazio);
+    return;
+  }
+
+  var receitaRecebida = 0, receitaTotal = 0, despesaPaga = 0;
+  var despesaPrevista = 0, despesaAPagar = 0, despesaSemValor = 0;
+  graficos.forEach(function (g) {
+    receitaRecebida += Number(g.receita_recebida) || 0;
+    receitaTotal += Number(g.receita_total) || 0;
+    despesaPaga += Number(g.despesa_paga) || 0;
+    despesaPrevista += Number(g.despesa_prevista) || 0;
+    despesaAPagar += Number(g.despesa_a_pagar) || 0;
+    despesaSemValor += Number(g.despesa_sem_valor) || 0;
+  });
+
+  var cartaoSaldo = cartaoGrafico('Receitas × despesas × saldo');
+  cartaoSaldo.appendChild(linhaGrafico('Receitas recebidas', receitaRecebida));
+  cartaoSaldo.appendChild(linhaGrafico('Despesas pagas', despesaPaga));
+  cartaoSaldo.appendChild(linhaGrafico('Saldo', receitaRecebida - despesaPaga));
+  el.grafLista.appendChild(cartaoSaldo);
+
+  var maxPag = Math.max(despesaPaga, despesaAPagar);
+  var cartaoPago = cartaoGrafico('Pago × a pagar');
+  cartaoPago.appendChild(barraGrafico('Pago', despesaPaga, maxPag, 'graf-pago'));
+  cartaoPago.appendChild(barraGrafico('A pagar', despesaAPagar, maxPag, 'graf-apagar'));
+  el.grafLista.appendChild(cartaoPago);
+
+  var meses = graficos.slice().reverse();
+  var maxDespesa = Math.max.apply(null, meses.map(function (g) {
+    return Number(g.despesa_prevista) || 0;
+  }).concat([1]));
+  var cartaoDespesa = cartaoGrafico('Despesas por mês');
+  meses.forEach(function (g) {
+    cartaoDespesa.appendChild(barraGrafico(
+      fmtMes.format(comoData(g.competencia)), g.despesa_prevista, maxDespesa, 'graf-pago'));
+  });
+  el.grafLista.appendChild(cartaoDespesa);
+
+  var maxAberto = Math.max.apply(null, meses.map(function (g) {
+    return Number(g.despesa_a_pagar) || 0;
+  }).concat([1]));
+  var cartaoAberto = cartaoGrafico('Evolução do valor em aberto');
+  meses.forEach(function (g) {
+    cartaoAberto.appendChild(barraGrafico(
+      fmtMes.format(comoData(g.competencia)), g.despesa_a_pagar, maxAberto, 'graf-apagar'));
+  });
+  el.grafLista.appendChild(cartaoAberto);
+}
+
+el.btnGraficos.addEventListener('click', async function () {
+  mostrarTela('graficos');
+  await carregarGraficos();
+});
+el.grafVoltar.addEventListener('click', function () {
   mostrarTela('mes');
   desenhar();
 });

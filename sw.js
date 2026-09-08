@@ -9,7 +9,7 @@ var VERSAO = 'nossas-contas-v7';
 // única garantia — nenhum cache tem como servir o que nunca pediram.
 // Ao mudar o ?v=, mude nos DOIS arquivos: a bancada confere que batem.
 var CASCA = [
-  './', './index.html', './app.css?v=12', './app.js?v=13', './config.js?v=10',
+  './', './index.html', './app.css?v=13', './app.js?v=14', './config.js?v=10',
   './vendor/supabase.js', './manifest.webmanifest',
   './icones/icone-192.png', './icones/icone-512.png',
   './icones/icone-maskable-512.png', './icones/apple-touch-icon.png'

@@ -42,7 +42,9 @@ CONTAS_CASA/
 │   ├── 14_receitas.sql        receitas: tabela, RLS, trigger e resumo mensal
 │   ├── 14_prova_receitas.sql  prova do bloco 14
 │   ├── 15_historico_legado.sql  histórico legado: tabelas, RLS e importador
-│   └── 15_prova_historico_legado.sql  prova do bloco 15
+│   ├── 15_prova_historico_legado.sql  prova do bloco 15
+│   ├── 12_graficos.sql          RPC de gráficos sobre despesas e receitas
+│   └── 12_prova_graficos.sql    prova do bloco 12
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -145,7 +147,7 @@ iPhone, porque o app instalado não enxerga a sessão do Safari.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
  onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 230 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 242 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -228,12 +230,12 @@ cliente.
 
 ## Estado atual
 
-Os blocos **1 a 15** estão concluídos. O `sql/11` foi aplicado no banco em
+Os blocos **1 a 15** estão concluídos, e o **Bloco 12** também. O `sql/11` foi aplicado no banco em
 06/09/2026 e provado ali mesmo. O `sql/13` foi aplicado em produção em
 07/09/2026 e a prova SQL passou. O `sql/14` também foi aplicado e provado em
 produção. O `sql/15` foi aplicado e provado, e o histórico legado real foi
-importado. A bancada fecha em
-`230 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+importado. O `sql/12` de gráficos também foi aplicado e provado. A bancada
+fecha em `242 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
   recuperação de senha) estão implementados e no ar.
@@ -243,6 +245,8 @@ importado. A bancada fecha em
   uma tabela separada, e `receitas_mensais()` resume cada competência.
 - Bloco **15** (histórico legado) está implementado e provado: três tabelas
   históricas, importação controlada e leitura separada da operação corrente.
+- Bloco **12** (gráficos) está implementado e provado: `graficos()` agrega
+  despesas e receitas correntes, sem incluir o histórico legado.
 - **Realtime entre dois aparelhos** foi validado manualmente: a mudança feita
   num aparelho aparece no outro praticamente imediatamente. A bancada cobre o
   lado local; a validação manual cobre a travessia da rede.
@@ -261,7 +265,7 @@ O roadmap segue nesta ordem:
 |---|---|---|
 | **14** | receitas | concluído; nova tabela `receita`, separada de `lancamento` |
 | **15** | histórico legado | concluído; histórico antigo preservado em tabelas próprias |
-| **12** | gráficos | próximo bloco, sobre o modelo financeiro estabilizado |
+| **12** | gráficos | concluído; camada somente leitura sobre o modelo financeiro estabilizado |
 
 As decisões de desenho de “Parcelar” direto no lançamento e da UX do código de
 pagamento estão registradas em `ESTADO.md`, nas seções **ESTADO ATUAL** e

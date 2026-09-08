@@ -258,6 +258,52 @@ button { border: 0; background: none; cursor: pointer; }
   border-left: 3px solid var(--pago);
 }
 
+/* gráficos: leitura, sem interação de escrita */
+.graf-cartao {
+  background: var(--papel);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 12px 13px;
+  margin-bottom: 10px;
+}
+.graf-cartao h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  letter-spacing: -.01em;
+}
+.graf-linha-texto {
+  margin: 5px 0;
+  font-size: 15px;
+  color: var(--texto);
+}
+.graf-linha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+}
+.graf-rotulo {
+  flex: none;
+  width: 118px;
+  font-size: 13px;
+  color: var(--fraco);
+  text-transform: lowercase;
+}
+.graf-trilho {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--borda);
+  overflow: hidden;
+}
+.graf-preenchida {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.graf-pago { background: var(--pago); }
+.graf-apagar { background: var(--alerta); }
+
 /* conta fixa desligada: continua legível, mas claramente fora do ar */
 .item.desligado { opacity: .45; }
 .item.desligado .marca { border-style: dashed; }

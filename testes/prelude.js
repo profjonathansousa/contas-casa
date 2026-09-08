@@ -180,6 +180,19 @@ var LEGADO_RESUMOS = [
     texto: 'Total legado', valor: 150.00, ordem_original: 1 }
 ];
 
+var GRAFICOS = [
+  { competencia: MES,
+    despesa_prevista: 2025.30, despesa_paga: 129.90, despesa_a_pagar: 1895.40,
+    despesa_contas: 5, despesa_sem_valor: 2,
+    receita_total: 5120.50, receita_recebida: 5000.00,
+    receita_a_receber: 120.50, receita_contas: 2, saldo: 4870.10 },
+  { competencia: MES_ANTERIOR,
+    despesa_prevista: 1000.00, despesa_paga: 100.00, despesa_a_pagar: 900.00,
+    despesa_contas: 3, despesa_sem_valor: 1,
+    receita_total: 850.00, receita_recebida: 850.00,
+    receita_a_receber: 0.00, receita_contas: 1, saldo: 750.00 }
+];
+
 function thenable(valor) {
   var o = {
     eq: function (col, v) { o._eq = o._eq || {}; o._eq[col] = v; return o; },
@@ -237,6 +250,7 @@ var supabase = {
           if (nome === 'gerar_mes') return { data: 1, error: null };
           if (nome === 'historico') return { data: HISTORICO, error: null };
           if (nome === 'receitas_mensais') return { data: RECEITAS_MENSAIS, error: null };
+          if (nome === 'graficos') return { data: GRAFICOS, error: null };
           return { data: MODELOS.length, error: null };
         });
       },

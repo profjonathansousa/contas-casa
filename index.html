@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
 <link rel="icon" href="icones/icone-192.png">
-<link rel="stylesheet" href="app.css?v=12">
+<link rel="stylesheet" href="app.css?v=13">
 </head>
 <body>
 
@@ -76,6 +76,7 @@
       <button type="button" id="pref-20h" class="pref"></button>
     </div>
     <div class="links">
+      <button id="btn-graficos" class="sair">gráficos</button>
       <button id="btn-historico" class="sair">histórico</button>
       <button id="btn-fixas" class="sair">contas fixas</button>
       <button id="btn-senha" class="sair">trocar senha</button>
@@ -85,6 +86,21 @@
 
   <button id="btn-add" class="fab" aria-label="Adicionar conta">+</button>
 </main>
+
+<!-- ---------- gráficos ---------- -->
+<section id="tela-graficos" class="tela" hidden>
+  <header class="topo">
+    <div class="linha-mes">
+      <button id="graf-voltar" class="seta" aria-label="Voltar">&lsaquo;</button>
+      <span class="nome-mes">Gráficos</span>
+      <span class="seta" aria-hidden="true"></span>
+    </div>
+    <p class="fx-explica">Somente despesas e receitas correntes. O histórico
+      legado não entra nestes gráficos.</p>
+  </header>
+
+  <div id="graf-lista" class="lista"></div>
+</section>
 
 <!-- ---------- histórico ---------- -->
 <section id="tela-historico" class="tela" hidden>
@@ -224,6 +240,6 @@
 
 <script src="vendor/supabase.js"></script>
 <script src="config.js?v=10"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

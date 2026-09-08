@@ -1,13 +1,14 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 07/09/2026 — blocos 11 e 13 em produção; blocos 14 e 15
-implementados, aplicados e provados no banco. Blocos 1 a 15 concluídos.
+Atualizado em 07/09/2026 — blocos 11 e 13 em produção; blocos 14, 15 e 12
+implementados, aplicados e provados no banco. Blocos 1 a 15 e Bloco 12
+concluídos.
 
 ## ESTADO ATUAL
 
 ### O que está de pé
 
-- Blocos **1 a 15** concluídos.
+- Blocos **1 a 15** concluídos, e o **Bloco 12** também.
 - Bloco **11** (o mês corrente nasce sozinho ao abrir o app) **no ar**:
   `sql/11_geracao_automatica.sql` aplicado em 06/09/2026, provado em produção,
   e o app mesclado depois disso.
@@ -19,7 +20,9 @@ implementados, aplicados e provados no banco. Blocos 1 a 15 concluídos.
 - Bloco **15** (histórico legado) **implementado e provado no banco**:
   `sql/15_historico_legado.sql` aplicado, `sql/15_prova_historico_legado.sql`
   aprovado e o histórico real importado em tabelas próprias.
-- Bancada verde em **230 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bloco **12** (gráficos) **implementado e provado no banco**:
+  `sql/12_graficos.sql` aplicado e `sql/12_prova_graficos.sql` aprovado.
+- Bancada verde em **242 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.
@@ -61,6 +64,7 @@ A terceira coluna é a que quase sempre falta.
 | **histórico derivado** | sim (bloco 13) | sim (bancada + prova SQL) | **sim — aplicado, provado no banco e publicado no Pages** |
 | **receitas** | sim (bloco 14) | sim (bancada + prova SQL do 14) | **não — aplicado e provado no banco; nenhuma receita real lançada ainda** |
 | **histórico legado** | sim (bloco 15) | sim (bancada + prova SQL do 15) | **sim — aplicado, provado e importado no banco; UI integrada** |
+| **gráficos** | sim (bloco 12) | sim (bancada + prova SQL do 12) | **não — aplicado e provado no banco; ainda não validado no aparelho** |
 | **trocar e recuperar a senha** | sim (bloco 10) | sim (os controles estão no placar atual) | **não — ainda não exercitado num aparelho depois do bloco 10** |
 | segundo morador (a esposa) | — | — | **não: nunca entrou** |
 
@@ -74,6 +78,8 @@ A terceira coluna é a que quase sempre falta.
    separada das despesas.
 5. **Conferir a visualização do histórico legado** num aparelho, depois do push
    desta implementação.
+6. **Conferir a tela de gráficos** num aparelho, depois do push desta
+   implementação.
 
 O **Realtime entre dois aparelhos** já está validado manualmente; não é uma
 pendência, mas deve ser revalidado em qualquer mudança futura que toque no
@@ -149,14 +155,22 @@ porquê de cada resposta. Em resumo:
 - `outubro/26` foi preservado na ordem original do arquivo; a posição incomum
   não foi reinterpretada.
 
-**Bloco 12 — gráficos**
+**Bloco 12 — gráficos — IMPLEMENTADO**
 
-- Só implementar depois de 13 e 14, para não refazer agregação.
-- Para “despesas por categoria” será necessário um campo formal de categoria
-  em `lancamento` (e provavelmente em `receita`); **sem classificação
-  automática por IA**.
-- Usar SVG/CSS nativo ou uma pequena camada desenhada à mão, sem framework de
-  gráfico no frontend.
+- Camada somente leitura: `public.graficos()` reutiliza `historico()` e
+  `receitas_mensais()`, sem criar tabela nem segunda fonte de verdade.
+- Indicadores: despesas por mês, pago × a pagar, evolução do valor em aberto e
+  receitas × despesas × saldo.
+- Período: somente competências correntes de `lancamento` e `receita`.
+- O histórico legado não entra nos gráficos.
+- RLS por casa, `security invoker`, `anon` sem `EXECUTE` e `authenticated` com
+  `EXECUTE`.
+
+**Gráficos por categoria — ainda não implementado**
+
+- Exigirá um campo formal de categoria em `lancamento` e, provavelmente, em
+  `receita`; **sem classificação automática por IA**.
+- Não faz parte do Bloco 12 atual.
 
 **“Parcelar” direto no lançamento**
 
@@ -198,7 +212,7 @@ porquê de cada resposta. Em resumo:
 |---|---|
 | **14** | receitas em tabela separada `receita` — concluído |
 | **15** | histórico legado em tabelas próprias — concluído |
-| **12** | gráficos — próximo bloco, sobre o modelo financeiro estabilizado |
+| **12** | gráficos — concluído; camada somente leitura sobre o modelo estabilizado |
 
 Gráficos ficam por último de propósito: devem ser construídos sobre um modelo
 financeiro já estável, com histórico e receitas definidos, para não nascerem
@@ -216,10 +230,9 @@ sobre agregações que depois mudam.
    dela — pré-requisito humano dos avisos por pessoa.
 4. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
    ou no mecanismo de `postgres_changes`.
-5. **Auditar o Bloco 15** antes de abrir o Bloco 12.
-6. Depois das pendências humanas e da auditoria do Bloco 15, seguir o roadmap
-   **14 → 15 → 12**, em blocos pequenos, com auditoria antes e depois e com a
-   bancada verde.
+5. **Auditar o Bloco 12** depois do push.
+6. Depois das pendências humanas e da auditoria do Bloco 12, seguir para as
+   validações manuais restantes, sem reabrir os blocos 11, 13, 14 ou 15.
 
 ## HISTÓRICO TÉCNICO
 

@@ -743,7 +743,33 @@ medir('navegação legada não chamou garantir_mes',
       LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length,
       garantirAntesLegado);
 
-print('\n== 22. receitas separadas das despesas ==');
+print('\n== 22. gráficos somente leitura ==');
+var gerarAntesGraf = LOG.rpcs.filter(function (r) { return r.nome === 'gerar_mes'; }).length;
+var garantirAntesGraf = LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length;
+var rpcAntesGraf = LOG.rpcs.length;
+q('#btn-graficos').disparar('click');
+esperar();
+medir('abriu a tela de gráficos', q('#tela-graficos').hidden, false);
+medir('escondeu a tela do mês', q('#tela-mes').hidden, true);
+medir('chamou a RPC graficos', LOG.rpcs.length - rpcAntesGraf, 1);
+medir('RPC graficos sem argumento', LOG.rpcs[LOG.rpcs.length - 1].args === undefined, true);
+medir('RPC graficos não é gerar_mes', LOG.rpcs[LOG.rpcs.length - 1].nome, 'graficos');
+medir('não chamou gerar_mes', LOG.rpcs.filter(function (r) { return r.nome === 'gerar_mes'; }).length,
+      gerarAntesGraf);
+medir('não chamou garantir_mes', LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length,
+      garantirAntesGraf);
+var cartoes = q('#graf-lista').filhos.filter(function (f) {
+  return f.className.indexOf('graf-cartao') === 0;
+});
+medir('quatro cartões de gráfico', cartoes.length, 4);
+medir('cartão de saldo mostra receitas', textoDe(cartoes[0]).indexOf('Receitas recebidas') >= 0, true);
+medir('cartão de pago mostra a pagar', textoDe(cartoes[1]).indexOf('A pagar') >= 0, true);
+q('#graf-voltar').disparar('click');
+esperar();
+medir('voltou para o mês', q('#tela-mes').hidden, false);
+medir('fechou os gráficos', q('#tela-graficos').hidden, true);
+
+print('\n== 23. receitas separadas das despesas ==');
 function receitasDesenhadas() {
   return q('#lista-receitas').filhos.filter(function (f) {
     return f.className.indexOf('item') === 0;
