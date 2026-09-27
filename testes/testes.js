@@ -503,7 +503,7 @@ medir('tipo lido do proprio codigo', LOG.updates[upC].valores.codigo_tipo, 'bole
 medir('valor veio do codigo', LOG.updates[upC].valores.valor_previsto, 212.30);
 medir('guardou so os digitos', LOG.updates[upC].valores.codigo_pagamento, bol);
 medir('folha fechou', q('#folha-codigo').hidden, true);
-medir('o chip agora oferece copiar', chipDe(itemPorDesc('Luz'))._txt, 'copiar código');
+medir('o chip agora diz o que copia', chipDe(itemPorDesc('Luz'))._txt, 'copiar código do boleto');
 
 print('\n  -- CONTROLE NEGATIVO --');
 print('  (conta que JA tem valor nao pode ser sobrescrita pelo codigo)');
@@ -547,6 +547,60 @@ medir('mandou nulo nos dois',
       [LOG.updates[upF].valores.codigo_pagamento, LOG.updates[upF].valores.codigo_tipo],
       [null, null]);
 medir('o chip volta a convidar', chipDe(itemPorDesc('Luz'))._txt, '+ código');
+
+print('\n  -- o rotulo diz o que vai ser copiado --');
+print('  (o codigo chega pelo Realtime, como se o outro aparelho tivesse colado)');
+var canalLanc = LOG.canais.filter(function (c) { return c.cfg && c.cfg.table === 'lancamento'; }).pop();
+var PIX_FAKE = '00020101021126360014br.gov.bcb.pix0114prova6304ABCD';
+function aguaCom(tipo, cod) {
+  canalLanc.fn({ eventType: 'UPDATE', new: {
+    id: 'l3', competencia: MESHOJE, descricao: 'Agua', dia_vencimento: 8,
+    vencimento: MESHOJE.slice(0, 8) + '08', valor_previsto: 95.40, valor_pago: null,
+    pago: false, pago_em: null, pago_por: null,
+    codigo_pagamento: cod, codigo_tipo: tipo } });
+  esperar();
+}
+aguaCom('arrecadacao', '836200000009540000000000000000000000000000000000');
+medir('conta de consumo', chipDe(itemPorDesc('Agua'))._txt, 'copiar código da conta');
+aguaCom('pix', PIX_FAKE);
+medir('pix', chipDe(itemPorDesc('Agua'))._txt, 'copiar código PIX');
+
+print('\n  -- alterar e remover a vista, sem precisar segurar --');
+var agua = itemPorDesc('Agua');
+medir('alterar aparece', partesDo(agua, 'acao-alterar')[0]._txt, 'alterar');
+medir('remover aparece', partesDo(agua, 'acao-remover')[0]._txt, 'remover');
+print('  -- CONTROLE NEGATIVO: sem codigo, nada para alterar ou remover --');
+medir('conta sem codigo nao tem alterar', partesDo(itemPorDesc('Luz'), 'acao-alterar').length, 0);
+medir('nem remover', partesDo(itemPorDesc('Luz'), 'acao-remover').length, 0);
+
+print('  (alterar abre a folha ja preenchida; nem marca pago, nem apaga)');
+var upAlt = LOG.updates.length;
+comBolha(partesDo(agua, 'acao-alterar')[0], agua, 'pointerdown');
+avancarTempo(700);
+comBolha(partesDo(agua, 'acao-alterar')[0], agua, 'click');
+esperar();
+medir('abriu a folha do codigo', q('#folha-codigo').hidden, false);
+medir('com o codigo atual', q('#cd-texto').value, PIX_FAKE);
+medir('e o tirar disponivel', q('#cd-tirar').hidden, false);
+medir('nao gravou nada', LOG.updates.length - upAlt, 0);
+medir('nao pediu para apagar a conta', q('#folha-apagar').hidden, true);
+q('#fundo-codigo').disparar('click');
+
+print('  (remover tira o codigo com um toque, sem confirmacao, e so o codigo)');
+agua = itemPorDesc('Agua');
+var upRem = LOG.updates.length;
+comBolha(partesDo(agua, 'acao-remover')[0], agua, 'pointerdown');
+avancarTempo(700);
+comBolha(partesDo(agua, 'acao-remover')[0], agua, 'click');
+esperar();
+medir('um update so', LOG.updates.length - upRem, 1);
+medir('nulo nos dois, nada mais', [LOG.updates[upRem].campos.slice().sort(),
+      LOG.updates[upRem].valores.codigo_pagamento, LOG.updates[upRem].valores.codigo_tipo],
+      [['codigo_pagamento', 'codigo_tipo'], null, null]);
+medir('sem folha de confirmacao', [q('#folha-codigo').hidden, q('#folha-apagar').hidden], [true, true]);
+medir('nao marcou pago', itemPorDesc('Agua').className.indexOf('pago') > 0, false);
+medir('o chip volta a convidar', chipDe(itemPorDesc('Agua'))._txt, '+ código');
+medir('e as acoes somem', partesDo(itemPorDesc('Agua'), 'acao-remover').length, 0);
 
 print('\n== 17. trocar a senha ==');
 print('  (no iPhone o Safari e o app da tela de inicio tem armazenamentos');

@@ -116,8 +116,10 @@ banco compara.
 ## Código de pagamento
 
 Cada conta guarda o código de barras ou o PIX copia-e-cola. Um toque em
-**"copiar código"** na linha devolve ele para a área de transferência na hora
-de pagar; **segurar** abre para trocar ou tirar.
+**"copiar código PIX"**, **"copiar código do boleto"** ou **"copiar código da
+conta"** — o botão diz qual é — devolve ele para a área de transferência na
+hora de pagar. Ao lado, **"alterar"** abre para trocar e **"remover"** tira o
+código com um toque; segurar o botão de copiar continua abrindo para trocar.
 
 O app **lê o código sem chamar ninguém**: os 47 dígitos do boleto carregam o
 valor e o fator de vencimento, os 48 da conta de consumo carregam o valor, e o
@@ -169,7 +171,7 @@ iPhone, porque o app instalado não enxerga a sessão do Safari.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
  onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 315 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 332 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -257,7 +259,7 @@ Os blocos **1 a 15** estão concluídos, e o **Bloco 12** também. O `sql/11` fo
 07/09/2026 e a prova SQL passou. O `sql/14` também foi aplicado e provado em
 produção. O `sql/15` foi aplicado e provado, e o histórico legado real foi
 importado. O `sql/12` de gráficos também foi aplicado e provado. A bancada
-fecha em `315 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+fecha em `332 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
   recuperação de senha) estão implementados e no ar.

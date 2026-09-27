@@ -3,7 +3,8 @@
 Atualizado em 27/09/2026 — auditoria de retomada; bloco 16 (correções de
 dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
 27/09/2026; bloco 18 (os gráficos desde o início) no ar desde 27/09/2026; bloco 19
-("parcelar" direto na conta do mês) no ar desde 27/09/2026.
+("parcelar" direto na conta do mês) no ar desde 27/09/2026; bloco 20 (UX do
+código de pagamento) na branch, sem mudança no banco.
 
 ## ESTADO ATUAL
 
@@ -61,7 +62,7 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
     tabela, lista em ordem, e o controle negativo (sem perfil) vê 0 meses.
   - Achado para a rodada dos gráficos: três meses antigos têm "a pagar"
     diferente de zero — itens sem marca de pago nem de riscado no arquivo.
-  - Bancada: **315 / 4 / 27 / 49**, 0 falhas. O controle negativo foi feito
+  - Bancada: **332 / 4 / 27 / 49**, 0 falhas. O controle negativo foi feito
     numa cópia: com a seção e a leitura do legado de volta na tela do mês,
     três medidas ficam vermelhas. O `localStorage` falso da bancada ganhou
     `length` e `key()`, como o do navegador: sem isso o logout era medido
@@ -92,7 +93,7 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
   - Provado no banco: 23 meses, 10 com riscada (9% do gasto do período), a
     mesma conta da tela de histórico mês a mês, nenhum saldo em mês antigo,
     nenhuma receita caindo em mês antigo, e o controle negativo vê 0 meses.
-  - Bancada **315 / 4 / 27 / 49**, 0 falhas. Controle negativo numa cópia:
+  - Bancada **332 / 4 / 27 / 49**, 0 falhas. Controle negativo numa cópia:
     com o mês antigo vazando para os cartões do app e a escala ignorando a
     riscada, sete medidas ficam vermelhas.
   - **Janela entre o SQL e o merge:** por cerca de 20 minutos a `graficos()`
@@ -129,11 +130,28 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
     parcelar de novo não duplica a fixa; fixa desligada de mesma descrição é
     religada; PIX estático copiado e dinâmico não; os quatro controles
     negativos e o de duas contas na mesma fixa recusados. Nada ficou gravado.
-  - Bancada **315 / 4 / 27 / 49**, 0 falhas. Controle negativo em quatro
+  - Bancada **332 / 4 / 27 / 49**, 0 falhas. Controle negativo em quatro
     mutações separadas (a quarta: chip de volta em conta vinda de fixa) (chip sem barrar o "segurar", checagem da janela
     removida, folha da fixa herdando o título do parcelar): todas vermelhas.
     O DOM da bancada não propaga eventos; a medida do "segurar" simula a
     propagação, senão não enxergaria o defeito.
+- **Bloco 20 — UX do código de pagamento**, como desenhado na auditoria.
+  Só tela; o banco não muda.
+  - O chip diz o que copia: **"copiar código PIX"**, **"copiar código do
+    boleto"**, **"copiar código da conta"**. Evita colar PIX no campo de
+    boleto do banco. Depois do "copiado ✓", volta ao rótulo do tipo.
+  - Com código guardado, **"alterar"** e **"remover"** ficam à vista na
+    linha. Segurar o chip continua abrindo a folha, como atalho. "Alterar"
+    abre a mesma folha, preenchida; "remover" tira o código com um toque, sem
+    confirmação, e só o código — valor e pago ficam.
+  - Nenhum dos dois marca pago nem abre o "apagar conta": o toque e o
+    segurar param no botão. As ações ficam lado a lado e quebram de linha
+    alinhadas à esquerda; cada rótulo fica inteiro, mesmo em 320 px.
+  - Bancada **332 / 4 / 27 / 49**, 0 falhas; os rótulos de PIX e de conta
+    de consumo são medidos chegando pelo Realtime, como se o outro aparelho
+    tivesse colado. Controle negativo em quatro mutações separadas (rótulo
+    genérico, "alterar" deixando o segurar passar, "remover" deixando o
+    toque marcar pago, ações sem código): todas vermelhas.
 - **Rodapé que empurrava a página para o lado**, achado na captura do bloco
   17 e corrigido no mesmo dia: desde o bloco 12 eram cinco links numa linha
   só, mais largos que um iPhone. Agora quebram em duas linhas, cada link
@@ -161,7 +179,7 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
   aprovado e o histórico real importado em tabelas próprias.
 - Bloco **12** (gráficos) **implementado e provado no banco**:
   `sql/12_graficos.sql` aplicado e `sql/12_prova_graficos.sql` aprovado.
-- Bancada verde em **315 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bancada verde em **332 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.
@@ -328,9 +346,9 @@ porquê de cada resposta. Em resumo:
 - Se o lançamento tiver PIX estático, copiar para `modelo.pix_estatico`; não
   copiar boleto/arrecadação nem PIX dinâmico.
 
-**UX do código de pagamento**
+**UX do código de pagamento — IMPLEMENTADO no bloco 20**
 
-- **Ainda NÃO implementado no código atual.** É melhoria pendente.
+- Registrado antes como melhoria pendente; implementado como desenhado.
 - O rótulo do botão passa a depender do `codigo_tipo`:
   `PIX → copiar código PIX`, `boleto → copiar código do boleto`,
   `arrecadacao → copiar código da conta`.
@@ -365,8 +383,8 @@ Ordem decidida por Jonathan na auditoria de 27/09/2026:
 2. ~~**Rodada dos gráficos**~~ **Feita no bloco 18, no ar em 27/09**; falta
    conferir no aparelho.
 3. ~~**"Parcelar" direto no lançamento**~~ **feito no bloco 19, no ar em
-   27/09**, falta conferir no aparelho; **UX do código de pagamento** é a
-   próxima.
+   27/09**, falta conferir no aparelho; ~~**UX do código de pagamento**~~
+   **feita no bloco 20**, falta o merge.
 4. **01/10: abrir o app** e conferir que outubro nasceu sozinho.
 5. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
    ou no mecanismo de `postgres_changes`.

@@ -937,6 +937,12 @@ function linha(it) {
   valor.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
 
   corpo.appendChild(chipCodigo(it));
+  if (it.codigo_pagamento) {
+    corpo.appendChild(acaoCodigo('acao-alterar', 'alterar', function () { abrirCodigo(it); }));
+    corpo.appendChild(acaoCodigo('acao-remover', 'remover', function () {
+      gravarCodigo(it, { codigo_pagamento: null, codigo_tipo: null });
+    }));
+  }
   if (it.parcela_n == null && it.modelo_id == null) corpo.appendChild(chipParcelar(it));
 
   ligarToques(div, function () { alternarPago(it); }, function () { pedirApagar(it, 'lancamento'); });
@@ -952,16 +958,34 @@ var NOME_TIPO = { boleto: 'Boleto', arrecadacao: 'Conta de consumo', pix: 'PIX' 
 // Um toque copia; segurar abre para trocar ou tirar. É o mesmo vocabulário da
 // linha (toque faz o comum, segurar faz o raro), então não há gesto novo para
 // aprender. O stopPropagation impede que segurar aqui vire "apagar a conta".
+// Dizer o que vai ser copiado evita colar PIX no campo de boleto do banco.
+var ROTULO_COPIAR = { pix: 'copiar código PIX', boleto: 'copiar código do boleto',
+                      arrecadacao: 'copiar código da conta' };
+function rotuloCopiar(it) { return ROTULO_COPIAR[it.codigo_tipo] || 'copiar código'; }
+
 function chipCodigo(it) {
   var b = document.createElement('button');
   b.type = 'button';
   b.className = 'codigo' + (it.codigo_pagamento ? '' : ' vazio');
-  b.textContent = it.codigo_pagamento ? 'copiar código' : '+ código';
+  b.textContent = it.codigo_pagamento ? rotuloCopiar(it) : '+ código';
   b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
   b.addEventListener('click', function (ev) { ev.stopPropagation(); });
   ligarToques(b,
     function () { if (it.codigo_pagamento) copiarCodigo(it, b); else abrirCodigo(it); },
     function () { abrirCodigo(it); });
+  return b;
+}
+
+// Com código guardado, trocar e tirar ficam à vista: segurar o chip continua
+// valendo como atalho, mas ninguém descobre um gesto escondido sozinho.
+// Remover não pede confirmação — um toque, como o resto do app.
+function acaoCodigo(classe, texto, fazer) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = classe;
+  b.textContent = texto;
+  b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+  b.addEventListener('click', function (ev) { ev.stopPropagation(); fazer(); });
   return b;
 }
 
@@ -986,7 +1010,7 @@ async function copiarCodigo(it, botao) {
     await navigator.clipboard.writeText(it.codigo_pagamento);
     botao.textContent = 'copiado ✓';
     if (navigator.vibrate) navigator.vibrate(8);
-    setTimeout(function () { botao.textContent = 'copiar código'; }, 2500);
+    setTimeout(function () { botao.textContent = rotuloCopiar(it); }, 2500);
   } catch (e) {
     aviso('Não consegui copiar sozinho. Segure aqui para ver o código.');
   }
