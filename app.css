@@ -107,7 +107,10 @@ button { border: 0; background: none; cursor: pointer; }
 .lista { padding: 6px 10px 8px; }
 .rodape { padding: 18px 10px calc(110px + env(safe-area-inset-bottom)); text-align: center; }
 .dica { color: var(--fraco); font-size: 13.5px; margin: 0 0 6px; }
-.links { display: flex; justify-content: center; gap: 4px; }
+/* Cinco links não cabem numa linha de iPhone: quebram em duas, e cada um
+   fica inteiro ("contas fixas" não vira duas linhas). */
+.links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 4px; }
+.links .sair { padding: 12px 14px; white-space: nowrap; }
 .avisos {
   display: block; margin: 0 auto 14px; padding: 12px 20px; border-radius: 999px;
   border: 1px solid var(--borda); background: var(--papel);

@@ -65,6 +65,11 @@ os gráficos.
     três medidas ficam vermelhas. O `localStorage` falso da bancada ganhou
     `length` e `key()`, como o do navegador: sem isso o logout era medido
     pelo caminho que nenhum aparelho usa.
+- **Rodapé que empurrava a página para o lado**, achado na captura do bloco
+  17 e corrigido no mesmo dia: desde o bloco 12 eram cinco links numa linha
+  só, mais largos que um iPhone. Agora quebram em duas linhas, cada link
+  inteiro, com 44 px de toque. Medido no navegador a 320, 375 e 430 px: a
+  página tem exatamente a largura da tela. `app.css?v=15`, casca `v9`.
 - **Validado por Jonathan:** a segunda pessoa da casa entra no app e os
   avisos chegam para os dois.
 - **Em pausa, por decisão:** proteção de senha vazada no Supabase.
