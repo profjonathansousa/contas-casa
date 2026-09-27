@@ -46,7 +46,9 @@ CONTAS_CASA/
 │   ├── 12_graficos.sql          RPC de gráficos sobre despesas e receitas
 │   ├── 12_prova_graficos.sql    prova do bloco 12
 │   ├── 16_correcoes_de_dados.sql  outubro/2025 no legado; marca de outubro/2026
-│   └── 16_prova_correcoes.sql     prova do bloco 16
+│   ├── 16_prova_correcoes.sql     prova do bloco 16
+│   ├── 17_historico_completo.sql  o histórico numa tela só: app + arquivo antigo
+│   └── 17_prova_historico_completo.sql  prova do bloco 17
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -133,6 +135,12 @@ na linha **apaga a conta**, e esse pede confirmação, porque apagar não se
 desfaz. O `+` adiciona uma conta avulsa ao mês que está na tela. Tocar no nome
 do mês volta para o mês corrente.
 
+No rodapé, **"histórico"** lista todos os meses, do mais recente ao mais
+antigo: os do app e os do arquivo antigo, que vem desde novembro/2024. Mês do
+app abre na tela do mês, como sempre; mês do arquivo antigo abre só para
+leitura, com as contas **riscadas** — as que saíram do controle naquele mês —
+num grupo próprio, com o subtotal delas, fora dos totais.
+
 No rodapé, **"Avisar neste aparelho"** liga as notificações, e os três
 interruptores logo abaixo dizem quais avisos você quer receber. Toque liga e
 desliga cada um.
@@ -149,7 +157,7 @@ iPhone, porque o app instalado não enxerga a sessão do Safari.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
  onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 242 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 261 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -237,7 +245,7 @@ Os blocos **1 a 15** estão concluídos, e o **Bloco 12** também. O `sql/11` fo
 07/09/2026 e a prova SQL passou. O `sql/14` também foi aplicado e provado em
 produção. O `sql/15` foi aplicado e provado, e o histórico legado real foi
 importado. O `sql/12` de gráficos também foi aplicado e provado. A bancada
-fecha em `242 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+fecha em `261 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
   recuperação de senha) estão implementados e no ar.

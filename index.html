@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
 <link rel="icon" href="icones/icone-192.png">
-<link rel="stylesheet" href="app.css?v=13">
+<link rel="stylesheet" href="app.css?v=14">
 </head>
 <body>
 
@@ -59,14 +59,6 @@
     <div id="lista-receitas" class="lista"></div>
   </section>
 
-  <section id="legado" class="legado">
-    <div class="legado-cab">
-      <h2>Histórico legado</h2>
-    </div>
-    <p id="legado-resumo" class="legado-resumo"></p>
-    <div id="lista-legado" class="lista"></div>
-  </section>
-
   <footer class="rodape">
     <p class="dica">Segure uma conta para apagar.</p>
     <button id="btn-avisos" class="avisos" hidden></button>
@@ -110,10 +102,26 @@
       <span class="nome-mes">Histórico</span>
       <span class="seta" aria-hidden="true"></span>
     </div>
-    <p class="fx-explica">Meses com contas lançadas. Toque em um mês para abri-lo.</p>
+    <p class="fx-explica">Todos os meses, do mais recente ao mais antigo — os do
+      app e os do arquivo antigo. Toque em um mês para abri-lo.</p>
   </header>
 
   <div id="hist-lista" class="lista"></div>
+</section>
+
+<!-- ---------- um mês do arquivo antigo ---------- -->
+<section id="tela-legado" class="tela" hidden>
+  <header class="topo">
+    <div class="linha-mes">
+      <button id="lg-voltar" class="seta" aria-label="Voltar ao histórico">&lsaquo;</button>
+      <span id="lg-nome" class="nome-mes">&nbsp;</span>
+      <span class="seta" aria-hidden="true"></span>
+    </div>
+    <p class="fx-explica">Mês do arquivo antigo, de antes do app. Só leitura.</p>
+  </header>
+
+  <p id="legado-resumo" class="legado-resumo"></p>
+  <div id="lista-legado" class="lista"></div>
 </section>
 
 <!-- ---------- contas fixas ---------- -->
@@ -240,6 +248,6 @@
 
 <script src="vendor/supabase.js"></script>
 <script src="config.js?v=10"></script>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

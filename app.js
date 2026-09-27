@@ -29,6 +29,7 @@ var el = {
   histLista: $('#hist-lista'), histVoltar: $('#hist-voltar'),
   btnAddReceita: $('#btn-add-receita'), receitasLista: $('#lista-receitas'),
   receitasResumo: $('#receitas-resumo'),
+  legado: $('#tela-legado'), lgVoltar: $('#lg-voltar'), lgNome: $('#lg-nome'),
   legadoLista: $('#lista-legado'), legadoResumo: $('#legado-resumo'),
   fixas: $('#tela-fixas'), fxLista: $('#fx-lista'), fxVoltar: $('#fx-voltar'),
   fxAdd: $('#fx-add'), fxDoMes: $('#fx-do-mes'), btnAvisos: $('#btn-avisos'),
@@ -71,11 +72,11 @@ var paraApagar = null;      // item aguardando confirmação de exclusão
 var tipoApagar = 'lancamento';
 var modoFolha = 'lancamento';   // a folha de "+" serve às duas telas
 var modelos = [];               // contas fixas
-var historico = [];             // resumo derivado no banco
+var historico = [];             // meses do app e do arquivo antigo, somados no banco
 var receitas = [];              // receitas do mês, separadas das despesas
-var legado = [];                // despesas do histórico legado
-var legadoReceitas = [];        // receitas do histórico legado
-var legadoResumos = [];         // totais/resumos do histórico legado
+var legado = [];                // despesas do mês antigo aberto no histórico
+var legadoReceitas = [];        // receitas do mês antigo aberto
+var legadoResumos = [];         // totais/resumos do mês antigo aberto
 var graficos = [];              // série mensal para os gráficos
 var COLUNAS_MODELO = 'id,descricao,dia_vencimento,valor_padrao,ativo,parcelas_total,parcela_1,pix_estatico';
 var COLUNAS_PERFIL = 'id, casa_id, nome, avisa_vespera_20h, avisa_dia_12h, avisa_dia_20h';
@@ -334,20 +335,10 @@ function cacheGravarReceitas() {
 function cacheLerReceitas() {
   try { return JSON.parse(localStorage.getItem(chaveCacheReceitas()) || 'null'); } catch (e) { return null; }
 }
-function chaveCacheLegado() { return 'legado:' + (eu ? eu.casa_id : '?') + ':' + comp; }
-function cacheGravarLegado() {
-  try {
-    localStorage.setItem(chaveCacheLegado(), JSON.stringify({
-      despesas: legado, receitas: legadoReceitas, resumos: legadoResumos
-    }));
-  } catch (e) {}
-}
-function cacheLerLegado() {
-  try { return JSON.parse(localStorage.getItem(chaveCacheLegado()) || 'null'); } catch (e) { return null; }
-}
 // Sair tem que levar o dinheiro embora: o cache de pintura guarda descrição e
 // valor das contas e das receitas, e sem isto eles ficavam no aparelho depois
-// do logout.
+// do logout. O prefixo 'legado:' é de aparelhos que ainda guardam o cache da
+// época em que o legado aparecia na tela do mês.
 function cacheApagar() {
   try {
     if (typeof localStorage.length === 'number' && typeof localStorage.key === 'function') {
@@ -361,7 +352,6 @@ function cacheApagar() {
     } else {
       localStorage.removeItem(chaveCache());
       localStorage.removeItem(chaveCacheReceitas());
-      localStorage.removeItem(chaveCacheLegado());
     }
   } catch (e) {}
 }
@@ -466,15 +456,9 @@ async function carregarPerfis() {
 async function carregarMes() {
   var doCache = cacheLer();
   var doCacheReceitas = cacheLerReceitas();
-  var doCacheLegado = cacheLerLegado();
   if (doCache) { itens = doCache; }
   if (doCacheReceitas) { receitas = doCacheReceitas; }
-  if (doCacheLegado) {
-    legado = doCacheLegado.despesas || [];
-    legadoReceitas = doCacheLegado.receitas || [];
-    legadoResumos = doCacheLegado.resumos || [];
-  }
-  if (doCache || doCacheReceitas || doCacheLegado) { desenhar(); }
+  if (doCache || doCacheReceitas) { desenhar(); }
 
   var r = await db.from('lancamento').select(COLUNAS)
     .eq('competencia', comp)
@@ -496,34 +480,6 @@ async function carregarMes() {
     receitas = rr.data;
     cacheGravarReceitas();
   }
-
-  var rl = await db.from('historico_legado').select(COLUNAS_LEGADO)
-    .eq('competencia', comp)
-    .order('ordem_original', { ascending: true });
-  if (rl.error) {
-    aviso('Não consegui carregar o histórico legado. ' + rl.error.message);
-  } else {
-    legado = rl.data;
-  }
-
-  var rlr = await db.from('historico_legado_receita').select(COLUNAS_LEGADO_RECEITA)
-    .eq('competencia', comp)
-    .order('ordem_original', { ascending: true });
-  if (rlr.error) {
-    aviso('Não consegui carregar as receitas do histórico legado. ' + rlr.error.message);
-  } else {
-    legadoReceitas = rlr.data;
-  }
-
-  var rls = await db.from('historico_legado_resumo').select(COLUNAS_LEGADO_RESUMO)
-    .eq('competencia', comp)
-    .order('ordem_original', { ascending: true });
-  if (rls.error) {
-    aviso('Não consegui carregar os resumos do histórico legado. ' + rls.error.message);
-  } else {
-    legadoResumos = rls.data;
-  }
-  cacheGravarLegado();
 
   desenhar();
 }
@@ -653,7 +609,6 @@ function desenhar() {
   }
 
   desenharReceitas();
-  desenharLegado();
 }
 
 function receitasDoMes() {
@@ -684,47 +639,46 @@ function desenharReceitas() {
   doMes.forEach(function (r) { el.receitasLista.appendChild(linhaReceita(r)); });
 }
 
-function legadoDoMes(lista) {
-  return lista.filter(function (x) { return x.competencia === comp; });
+function grupoLegado(texto) {
+  var t = document.createElement('div');
+  t.className = 'legado-grupo';
+  t.textContent = texto;
+  el.legadoLista.appendChild(t);
 }
 
-function desenharLegado() {
-  var despesas = legadoDoMes(legado);
-  var receitasLegado = legadoDoMes(legadoReceitas);
-  var resumos = legadoDoMes(legadoResumos);
+// Um mês do arquivo antigo, aberto a partir do histórico. Os totais vêm da
+// linha que o banco já somou (historico_completo), os mesmos que a lista
+// mostra: a tela não refaz a conta. Riscada ficou fora do controle naquele
+// mês, mas existiu — aparece em grupo próprio, com o seu subtotal.
+function desenharMesAntigo(h) {
+  el.lgNome.textContent = rotuloMes(h.competencia);
+  el.legadoResumo.textContent = 'Previsto R$ ' + reais(h.previsto)
+    + ' | Pago R$ ' + reais(h.pago)
+    + ' | A pagar R$ ' + reais(h.a_pagar);
 
-  var partes = [];
-  if (despesas.length) partes.push(despesas.length === 1 ? '1 despesa histórica'
-                                    : despesas.length + ' despesas históricas');
-  if (receitasLegado.length) partes.push(receitasLegado.length === 1 ? '1 receita histórica'
-                                    : receitasLegado.length + ' receitas históricas');
-  el.legadoResumo.textContent = partes.length
-    ? partes.join(' · ') : 'Nenhum registro legado neste mês.';
+  var controladas = legado.filter(function (x) { return !x.riscado; });
+  var riscadas = legado.filter(function (x) { return x.riscado; });
 
   el.legadoLista.textContent = '';
 
-  if (despesas.length) {
-    var tituloDespesas = document.createElement('div');
-    tituloDespesas.className = 'legado-grupo';
-    tituloDespesas.textContent = 'Despesas históricas';
-    el.legadoLista.appendChild(tituloDespesas);
-    despesas.forEach(function (it) { el.legadoLista.appendChild(linhaLegadoDespesa(it)); });
+  if (controladas.length) {
+    grupoLegado('Despesas');
+    controladas.forEach(function (it) { el.legadoLista.appendChild(linhaLegadoDespesa(it)); });
   }
 
-  if (receitasLegado.length) {
-    var tituloReceitas = document.createElement('div');
-    tituloReceitas.className = 'legado-grupo';
-    tituloReceitas.textContent = 'Receitas históricas';
-    el.legadoLista.appendChild(tituloReceitas);
-    receitasLegado.forEach(function (it) { el.legadoLista.appendChild(linhaLegadoReceita(it)); });
+  if (riscadas.length) {
+    grupoLegado('Riscadas — fora do controle · R$ ' + reais(h.riscado));
+    riscadas.forEach(function (it) { el.legadoLista.appendChild(linhaLegadoDespesa(it)); });
   }
 
-  if (resumos.length) {
-    var tituloResumos = document.createElement('div');
-    tituloResumos.className = 'legado-grupo';
-    tituloResumos.textContent = 'Resumos';
-    el.legadoLista.appendChild(tituloResumos);
-    resumos.forEach(function (it) {
+  if (legadoReceitas.length) {
+    grupoLegado('Receitas');
+    legadoReceitas.forEach(function (it) { el.legadoLista.appendChild(linhaLegadoReceita(it)); });
+  }
+
+  if (legadoResumos.length) {
+    grupoLegado('Resumos');
+    legadoResumos.forEach(function (it) {
       var p = document.createElement('p');
       p.className = 'legado-resumo-linha';
       p.textContent = it.texto + (it.valor != null ? ' — R$ ' + reais(it.valor) : '');
@@ -732,7 +686,7 @@ function desenharLegado() {
     });
   }
 
-  if (!despesas.length && !receitasLegado.length && !resumos.length) {
+  if (!legado.length && !legadoReceitas.length && !legadoResumos.length) {
     var vazio = document.createElement('p');
     vazio.className = 'vazio-mes';
     vazio.textContent = 'Nenhum registro legado neste mês.';
@@ -1266,6 +1220,7 @@ function mostrarTela(nome) {
   el.mes.hidden = nome !== 'mes';
   el.fixas.hidden = nome !== 'fixas';
   el.historico.hidden = nome !== 'historico';
+  el.legado.hidden = nome !== 'legado';
   el.graficos.hidden = nome !== 'graficos';
 }
 el.btnFixas.addEventListener('click', async function () {
@@ -1278,11 +1233,47 @@ el.fxVoltar.addEventListener('click', function () {
   desenhar();
 });
 
+// Os meses do app e os do arquivo antigo numa lista só. Quem decide onde o
+// legado para (antes do primeiro mês do app) e quanto soma cada mês é o
+// banco; aqui só se desenha.
 async function carregarHistorico() {
-  var r = await db.rpc('historico');
+  var r = await db.rpc('historico_completo');
   if (r.error) { aviso('Não consegui carregar o histórico. ' + r.error.message); return; }
   historico = r.data || [];
   desenharHistorico();
+}
+
+function rotuloMes(c) {
+  var r = fmtMes.format(comoData(c));
+  return r.charAt(0).toUpperCase() + r.slice(1);
+}
+
+async function abrirMesAntigo(h) {
+  legado = []; legadoReceitas = []; legadoResumos = [];
+  el.lgNome.textContent = rotuloMes(h.competencia);
+  el.legadoResumo.textContent = '';
+  el.legadoLista.textContent = '';
+  mostrarTela('legado');
+
+  var rl = await db.from('historico_legado').select(COLUNAS_LEGADO)
+    .eq('competencia', h.competencia)
+    .order('ordem_original', { ascending: true });
+  if (rl.error) { aviso('Não consegui carregar o mês antigo. ' + rl.error.message); }
+  else legado = rl.data;
+
+  var rlr = await db.from('historico_legado_receita').select(COLUNAS_LEGADO_RECEITA)
+    .eq('competencia', h.competencia)
+    .order('ordem_original', { ascending: true });
+  if (rlr.error) { aviso('Não consegui carregar as receitas do mês antigo. ' + rlr.error.message); }
+  else legadoReceitas = rlr.data;
+
+  var rls = await db.from('historico_legado_resumo').select(COLUNAS_LEGADO_RESUMO)
+    .eq('competencia', h.competencia)
+    .order('ordem_original', { ascending: true });
+  if (rls.error) { aviso('Não consegui carregar os resumos do mês antigo. ' + rls.error.message); }
+  else legadoResumos = rls.data;
+
+  desenharMesAntigo(h);
 }
 
 function desenharHistorico() {
@@ -1296,14 +1287,14 @@ function desenharHistorico() {
   }
 
   historico.forEach(function (h) {
+    var antigo = h.origem === 'legado';
     var botao = document.createElement('button');
     botao.type = 'button';
-    botao.className = 'hist-mes';
+    botao.className = antigo ? 'hist-mes antigo' : 'hist-mes';
 
     var titulo = document.createElement('div');
     titulo.className = 'hist-mes-titulo';
-    var rotulo = fmtMes.format(comoData(h.competencia));
-    titulo.textContent = rotulo.charAt(0).toUpperCase() + rotulo.slice(1);
+    titulo.textContent = rotuloMes(h.competencia);
 
     var resumo = document.createElement('div');
     resumo.className = 'hist-mes-resumo';
@@ -1313,12 +1304,19 @@ function desenharHistorico() {
 
     var contas = document.createElement('div');
     contas.className = 'hist-mes-contas';
-    contas.textContent = (h.contas === 1 ? '1 conta' : h.contas + ' contas');
+    var partes = [h.contas === 1 ? '1 conta' : h.contas + ' contas'];
+    if (antigo && h.riscadas > 0) {
+      partes.push((h.riscadas === 1 ? '1 riscada' : h.riscadas + ' riscadas')
+                  + ' (R$ ' + reais(h.riscado) + ')');
+    }
+    if (antigo) partes.push('arquivo antigo');
+    contas.textContent = partes.join(' · ');
 
     botao.appendChild(titulo);
     botao.appendChild(resumo);
     botao.appendChild(contas);
     botao.addEventListener('click', function () {
+      if (antigo) { abrirMesAntigo(h); return; }
       mostrarTela('mes');
       irPara(h.competencia);
     });
@@ -1333,6 +1331,9 @@ el.btnHistorico.addEventListener('click', async function () {
 el.histVoltar.addEventListener('click', function () {
   mostrarTela('mes');
   desenhar();
+});
+el.lgVoltar.addEventListener('click', function () {
+  mostrarTela('historico');
 });
 
 async function carregarGraficos() {

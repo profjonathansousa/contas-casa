@@ -56,11 +56,16 @@ Elem.prototype.appendChild = function (c) { c.pai = this; return _ap.call(this, 
 
 var window = { addEventListener: function () {}, CONFIG: { URL: 'http://x', ANON: 'k' } };
 var navigator = {};
+// length e key() existem porque o navegador tem, e é por eles que o logout
+// varre todo cache de pintura — inclusive o que sobrou de versão antiga.
 var localStorage = (function () {
   var m = {};
-  return { getItem: function (k) { return k in m ? m[k] : null; },
-           setItem: function (k, v) { m[k] = String(v); },
-           removeItem: function (k) { delete m[k]; } };
+  var o = { getItem: function (k) { return k in m ? m[k] : null; },
+            setItem: function (k, v) { m[k] = String(v); o.length = Object.keys(m).length; },
+            removeItem: function (k) { delete m[k]; o.length = Object.keys(m).length; },
+            key: function (i) { return Object.keys(m)[i] || null; },
+            length: 0 };
+  return o;
 })();
 // Relogio controlavel: o toque longo so pode ser medido se eu mandar no tempo.
 var TEMPOS = [], PROX_ID = 1;
@@ -163,21 +168,33 @@ var RECEITAS_MENSAIS = [
 ];
 
 // Histórico legado: somente leitura, separado de lancamento/modelo/receita.
+// Mora num mês de um ano atrás, antes do app — como na vida real.
+var MES_LEGADO = (function () {
+  var p = MES.split('-');
+  var d = new Date(+p[0] - 1, +p[1] - 1, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+})();
 var LEGADO = [
-  { id: 'lg1', competencia: MES, dia: 5, descricao: 'Despesa legada paga',
+  { id: 'lg1', competencia: MES_LEGADO, dia: 5, descricao: 'Despesa legada paga',
     valor: 100.00, pago: true, riscado: false, observacao: null,
     ordem_original: 1 },
-  { id: 'lg2', competencia: MES, dia: 8, descricao: 'Despesa legada riscada',
+  { id: 'lg2', competencia: MES_LEGADO, dia: 8, descricao: 'Despesa legada riscada',
     valor: 50.00, pago: false, riscado: true, observacao: 'cancelada',
     ordem_original: 2 }
 ];
 var LEGADO_RECEITAS = [
-  { id: 'lgr1', competencia: MES, dia: null, descricao: 'Entrada legada',
+  { id: 'lgr1', competencia: MES_LEGADO, dia: null, descricao: 'Entrada legada',
     valor: 200.00, recebido: true, observacao: null, ordem_original: 1 }
 ];
 var LEGADO_RESUMOS = [
-  { id: 'lgs1', competencia: MES, secao: 'total_despesas',
+  { id: 'lgs1', competencia: MES_LEGADO, secao: 'total_despesas',
     texto: 'Total legado', valor: 150.00, ordem_original: 1 }
+];
+// O mês antigo como o banco devolve em historico_completo(): a riscada fica
+// fora de previsto/pago/a_pagar, nas colunas próprias.
+var HISTORICO_LEGADO = [
+  { competencia: MES_LEGADO, origem: 'legado', previsto: 100.00, pago: 100.00,
+    a_pagar: 0.00, contas: 1, sem_valor: 0, riscado: 50.00, riscadas: 1 }
 ];
 
 var GRAFICOS = [
@@ -249,6 +266,13 @@ var supabase = {
           }
           if (nome === 'gerar_mes') return { data: 1, error: null };
           if (nome === 'historico') return { data: HISTORICO, error: null };
+          if (nome === 'historico_completo') {
+            return { data: HISTORICO.map(function (h) {
+              var c = { origem: 'app', riscado: 0, riscadas: 0 };
+              for (var k in h) c[k] = h[k];
+              return c;
+            }).concat(HISTORICO_LEGADO), error: null };
+          }
           if (nome === 'receitas_mensais') return { data: RECEITAS_MENSAIS, error: null };
           if (nome === 'graficos') return { data: GRAFICOS, error: null };
           return { data: MODELOS.length, error: null };

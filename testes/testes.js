@@ -19,7 +19,7 @@ esperar();
 
 print('\n== 1. abriu no mes corrente e pediu so esse mes ==');
 var MESHOJE = (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';})();
-medir('selects feitos', LOG.selects.length, 6);      // modelo + lancamento + receita + legado
+medir('selects feitos', LOG.selects.length, 3);      // modelo + lancamento + receita
 medir('primeiro foi o das fixas', LOG.selects[0].tabela, 'modelo');
 medir('competencia pedida', LOG.selects[1].comp, MESHOJE);
 medir('tela de login escondida', q('#tela-login').hidden, true);
@@ -674,12 +674,12 @@ esperar();
 medir('abriu a tela de historico', q('#tela-historico').hidden, false);
 medir('chamou a RPC historico', LOG.rpcs.length - rpcAntesHist, 1);
 medir('RPC sem casa_id', LOG.rpcs[LOG.rpcs.length - 1].args === undefined, true);
-medir('nao chamou gerar_mes', LOG.rpcs[LOG.rpcs.length - 1].nome, 'historico');
+medir('nao chamou gerar_mes', LOG.rpcs[LOG.rpcs.length - 1].nome, 'historico_completo');
 
 var histCards = q('#hist-lista').filhos.filter(function (f) {
   return f.className.indexOf('hist-mes') === 0;
 });
-medir('dois meses desenhados', histCards.length, 2);
+medir('dois meses do app e um antigo', histCards.length, 3);
 var rotuloMaisRecente = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
   .format(new Date(MESHOJE + 'T12:00:00'));
 rotuloMaisRecente = rotuloMaisRecente.charAt(0).toUpperCase() + rotuloMaisRecente.slice(1);
@@ -712,24 +712,76 @@ medir('historico nao chamou garantir_mes',
       LOG.rpcs.filter(function (r) { return r.nome === 'garantir_mes'; }).length,
       garantirAntesHist);
 
-print('\n== 21. historico legado separado da operacao corrente ==');
+print('\n== 21. o arquivo antigo mora no historico, nao na tela do mes ==');
+function leiturasLegado() {
+  return LOG.selects.filter(function (s) { return s.tabela.indexOf('historico_legado') === 0; });
+}
 function legadoDesenhados() {
   return q('#lista-legado').filhos.filter(function (f) {
     return f.className.indexOf('item') === 0;
   });
 }
-medir('seção de histórico legado visível', q('#legado').hidden, false);
-medir('resumo do legado', q('#legado-resumo')._txt,
-      '2 despesas históricas · 1 receita histórica');
-medir('despesas legadas desenhadas', legadoDesenhados().length, 3);
-medir('despesa paga legada', legadoDesenhados()[0].filhos[1].filhos[0]._txt,
+print('  (o querySelector da bancada inventa o elemento que falta; por isso a');
+print('   ausencia e medida no index.html real, e nas leituras que o app faz)');
+var htmlMes = readFile(DIR_APP + '/index.html');
+htmlMes = htmlMes.slice(htmlMes.indexOf('<main id="tela-mes"'), htmlMes.indexOf('</main>'));
+medir('a tela do mes nao tem secao de legado', htmlMes.indexOf('legado') < 0, true);
+medir('abrir, navegar e reabrir o mes nao leu o legado', leiturasLegado().length, 0);
+
+var cartaoAntigo = histCards[2];
+var rotuloAntigo = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
+  .format(new Date(MES_LEGADO + 'T12:00:00'));
+rotuloAntigo = rotuloAntigo.charAt(0).toUpperCase() + rotuloAntigo.slice(1);
+medir('mes antigo vem depois dos do app', cartaoAntigo.filhos[0]._txt, rotuloAntigo);
+medir('marcado como antigo', cartaoAntigo.className, 'hist-mes antigo');
+medir('mes do app nao e marcado', histCards[0].className, 'hist-mes');
+medir('totais do mes antigo sem a riscada', cartaoAntigo.filhos[1]._txt,
+      'Previsto R$ 100,00 | Pago R$ 100,00 | A pagar R$ 0,00');
+medir('riscada aparece a parte, com o valor', cartaoAntigo.filhos[2]._txt,
+      '1 conta · 1 riscada (R$ 50,00) · arquivo antigo');
+medir('mes do app nao ganha contagem de riscada', histCards[0].filhos[2]._txt, '5 contas');
+
+print('  -- tocar no mes antigo abre o detalhe dele, dentro do historico --');
+var selAntesAntigo = LOG.selects.length;
+var rpcAntesAntigo = LOG.rpcs.length;
+var updatesAntesAntigo = LOG.updates.length;
+cartaoAntigo.disparar('click');
+esperar();
+medir('abriu o mes antigo', q('#tela-legado').hidden, false);
+medir('saiu do historico', q('#tela-historico').hidden, true);
+medir('a tela do mes continua fechada', q('#tela-mes').hidden, true);
+medir('leu as tres tabelas do arquivo antigo',
+      LOG.selects.slice(selAntesAntigo).map(function (s) { return s.tabela; }),
+      ['historico_legado', 'historico_legado_receita', 'historico_legado_resumo']);
+medir('so do mes tocado', LOG.selects.slice(selAntesAntigo).every(function (s) {
+  return s.comp === MES_LEGADO; }), true);
+medir('nome do mes no topo', q('#lg-nome')._txt, rotuloAntigo);
+medir('totais sao os do banco, nao refeitos', q('#legado-resumo')._txt,
+      'Previsto R$ 100,00 | Pago R$ 100,00 | A pagar R$ 0,00');
+medir('linhas do mes antigo', legadoDesenhados().length, 3);
+medir('a despesa acompanhada vem primeiro', legadoDesenhados()[0].filhos[1].filhos[0]._txt,
       'Despesa legada paga');
-medir('despesa riscada legada tem riscado',
-      legadoDesenhados()[1].className.indexOf('riscado') > 0, true);
-medir('receita legada separada', legadoDesenhados()[2].filhos[1].filhos[0]._txt,
+medir('a riscada tem grupo proprio, com subtotal', textoDe(q('#lista-legado'))
+      .indexOf('Riscadas — fora do controle · R$ 50,00') >= 0, true);
+medir('e continua riscada', legadoDesenhados()[1].className.indexOf('riscado') > 0, true);
+medir('receita antiga separada', legadoDesenhados()[2].filhos[1].filhos[0]._txt,
       'Entrada legada');
-medir('resumo legado aparece', textoDe(q('#lista-legado'))
+medir('resumo antigo aparece', textoDe(q('#lista-legado'))
       .indexOf('Total legado') >= 0, true);
+
+print('  -- CONTROLE NEGATIVO: o mes antigo e so leitura --');
+medir('nenhuma RPC ao abrir o mes antigo', LOG.rpcs.length - rpcAntesAntigo, 0);
+medir('nenhuma escrita', LOG.updates.length - updatesAntesAntigo, 0);
+
+print('  -- voltar leva ao historico, sem recarregar --');
+var rpcAntesVoltar = LOG.rpcs.length;
+q('#lg-voltar').disparar('click');
+esperar();
+medir('voltou ao historico', q('#tela-historico').hidden, false);
+medir('fechou o mes antigo', q('#tela-legado').hidden, true);
+medir('nao buscou o historico de novo', LOG.rpcs.length - rpcAntesVoltar, 0);
+q('#hist-voltar').disparar('click');
+esperar();
 
 print('  -- navegar entre meses continua leitura, sem geração --');
 var gerarAntesLegado = LOG.rpcs.filter(function (r) { return r.nome === 'gerar_mes'; }).length;
@@ -868,11 +920,14 @@ medir('nova receita aparece', !!receitaAtual('Reembolso'), true);
 
 print('\n  -- logout limpa o cache de receitas --');
 var chaveReceitas = 'receitas:' + CASA + ':' + MESHOJE;
+print('  (o app nao grava mais cache de legado; o que sobrou num aparelho antigo');
+print('   tambem tem que sair no logout)');
 var chaveLegado = 'legado:' + CASA + ':' + MESHOJE;
+localStorage.setItem(chaveLegado, '{"despesas":[]}');
 q('#btn-sair').disparar('click');
 esperar();
 medir('cache de receitas limpo', localStorage.getItem(chaveReceitas), null);
-medir('cache de legado limpo', localStorage.getItem(chaveLegado), null);
+medir('cache de legado antigo limpo', localStorage.getItem(chaveLegado), null);
 
 print('\n----------------------------------------');
 print('medidas ok: ' + ok + '   falhas: ' + falhou);

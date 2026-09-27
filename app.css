@@ -199,26 +199,14 @@ button { border: 0; background: none; cursor: pointer; }
   margin-top: 2px;
 }
 
-/* histórico legado: leitura, separado da operação corrente */
-.legado {
-  margin: 14px 10px 0;
-  padding-top: 10px;
-  border-top: 1px solid var(--borda);
-}
-.legado-cab {
-  margin: 0 2px 2px;
-}
-.legado-cab h2 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -.01em;
-}
+/* mês do arquivo antigo: só leitura, aberto a partir do histórico */
+.hist-mes.antigo { background: transparent; border-style: dashed; }
 .legado-resumo {
-  margin: 4px 2px 8px;
+  margin: 12px 12px 0;
   color: var(--fraco);
   font-size: 14px;
 }
+.legado-resumo:empty { display: none; }
 .legado-grupo {
   margin: 12px 2px 6px;
   font-size: 13px;

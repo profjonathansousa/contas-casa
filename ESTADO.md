@@ -1,7 +1,9 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 27/09/2026 — auditoria de retomada e bloco 16 (correções de
-dados) aplicado no banco. Próxima rodada: o histórico numa tela só.
+Atualizado em 27/09/2026 — auditoria de retomada; bloco 16 (correções de
+dados) aplicado no banco; bloco 17 (o histórico numa tela só) com o SQL
+aplicado e provado, e o app numa branch esperando o merge. Próxima rodada:
+os gráficos.
 
 ## ESTADO ATUAL
 
@@ -31,7 +33,38 @@ dados) aplicado no banco. Próxima rodada: o histórico numa tela só.
 - **Contas riscadas no legado** (50, de novembro/2025 a agosto/2026, até 41%
   do valor de um mês): riscar queria dizer "saiu do meu controle" — eram
   contas pagas pela esposa, que Jonathan deixou de acompanhar. Não são
-  despesa que não existiu. Tratamento na próxima rodada.
+  despesa que não existiu. Tratamento decidido com Jonathan no bloco 17:
+  ficam à parte, nunca somadas em silêncio; os gráficos decidem se somam.
+- **Bloco 17 — o histórico numa tela só** (`sql/17_historico_completo.sql`,
+  prova em `sql/17_prova_historico_completo.sql`). SQL aplicado e provado em
+  27/09/2026; o app está na branch e entra no ar no merge.
+  - **A tela do mês não tem mais nada do legado**: nem seção, nem leitura, nem
+    cache. Navegar com as setas até um mês antigo mostra o mês vazio, como
+    qualquer mês sem conta.
+  - **A tela de histórico lista todos os meses**, de novembro/2024 até hoje: o
+    arquivo antigo até agosto/2026, o app de setembro/2026 em diante. O corte
+    é o primeiro mês de `mes_gerado` — tabela em que o cliente não escreve,
+    então uma conta digitada à mão num mês antigo não o arrasta. Setembro/2026
+    está nos dois lugares e vale o do app.
+  - **Mês antigo abre o detalhe dele**, dentro do histórico e só para leitura:
+    despesas acompanhadas, riscadas em grupo próprio com subtotal, receitas e
+    resumos. O voltar leva à lista, não à tela do mês.
+  - **Quem soma é o banco.** `historico_legado_mensal()` faz a conta de cada
+    mês antigo, com a riscada em colunas próprias (`riscado`, `riscadas`), e
+    `historico_completo()` junta os dois lados, cada linha dizendo sua
+    `origem`. As duas são `security invoker`, sem `EXECUTE` para `anon`.
+    `historico()` **não mudou**, porque a `graficos()` depende dela: os
+    gráficos só enxergam o legado na rodada deles.
+  - Provado no banco, como morador de verdade: 1 mês do app + 22 antigos,
+    nenhum mês antigo depois do corte, previsto + riscado igual à soma da
+    tabela, lista em ordem, e o controle negativo (sem perfil) vê 0 meses.
+  - Achado para a rodada dos gráficos: três meses antigos têm "a pagar"
+    diferente de zero — itens sem marca de pago nem de riscado no arquivo.
+  - Bancada: **261 / 4 / 27 / 49**, 0 falhas. O controle negativo foi feito
+    numa cópia: com a seção e a leitura do legado de volta na tela do mês,
+    três medidas ficam vermelhas. O `localStorage` falso da bancada ganhou
+    `length` e `key()`, como o do navegador: sem isso o logout era medido
+    pelo caminho que nenhum aparelho usa.
 - **Validado por Jonathan:** a segunda pessoa da casa entra no app e os
   avisos chegam para os dois.
 - **Em pausa, por decisão:** proteção de senha vazada no Supabase.
@@ -39,7 +72,8 @@ dados) aplicado no banco. Próxima rodada: o histórico numa tela só.
 
 ### O que está de pé
 
-- Blocos **1 a 16** concluídos, e o **Bloco 12** também.
+- Blocos **1 a 16** concluídos, e o **Bloco 12** também. Bloco **17** com o
+  banco pronto e o app esperando o merge.
 - Bloco **11** (o mês corrente nasce sozinho ao abrir o app) **no ar**:
   `sql/11_geracao_automatica.sql` aplicado em 06/09/2026, provado em produção,
   e o app mesclado depois disso.
@@ -53,7 +87,7 @@ dados) aplicado no banco. Próxima rodada: o histórico numa tela só.
   aprovado e o histórico real importado em tabelas próprias.
 - Bloco **12** (gráficos) **implementado e provado no banco**:
   `sql/12_graficos.sql` aplicado e `sql/12_prova_graficos.sql` aprovado.
-- Bancada verde em **242 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bancada verde em **261 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.
@@ -94,7 +128,7 @@ A terceira coluna é a que quase sempre falta.
 | **o mês corrente nasce sozinho** | sim (bloco 11) | sim (bancada 170/4/27/49 com dois controles negativos + réplica local, inclusive concorrência com duas sessões) | **parcialmente — `sql/11` aplicado e provado em produção em 06/09; o primeiro mês novo de verdade é 01/10 (a marca de outubro saiu no bloco 16)** |
 | **histórico derivado** | sim (bloco 13) | sim (bancada + prova SQL) | **sim — aplicado, provado no banco e publicado no Pages** |
 | **receitas** | sim (bloco 14) | sim (bancada + prova SQL do 14) | **não — aplicado e provado no banco; nenhuma receita real lançada ainda** |
-| **histórico legado** | sim (bloco 15) | sim (bancada + prova SQL do 15) | **dados sim (outubro/2025 corrigido no bloco 16); tela não — está na tela do mês, e o lugar certo é a tela de histórico** |
+| **histórico legado** | sim (bloco 15) | sim (bancada + prova SQL do 15) | **dados sim (outubro/2025 corrigido no bloco 16); tela: movida para o histórico no bloco 17, falta conferir no aparelho** |
 | **gráficos** | sim (bloco 12) | sim (bancada + prova SQL do 12) | **não — aplicado e provado no banco; ainda não validado no aparelho** |
 | **trocar e recuperar a senha** | sim (bloco 10) | sim (os controles estão no placar atual) | **não — ainda não exercitado num aparelho depois do bloco 10** |
 | segundo morador (a esposa) | — | — | **sim — entra no app e recebe os avisos (confirmado por Jonathan em 27/09)** |
@@ -180,7 +214,8 @@ porquê de cada resposta. Em resumo:
 - Histórico legado não vira `modelo`, não entra em `lancamento` e não participa
   da geração automática.
 - Na tela, o histórico legado aparece numa seção própria do mês, abaixo das
-  receitas, sem alterar totais correntes.
+  receitas, sem alterar totais correntes. *Desfeito no bloco 17 (27/09/2026):
+  o legado mora na tela de histórico, não na do mês.*
 - `outubro/26` foi preservado na ordem original do arquivo; a posição incomum
   não foi reinterpretada. *Em 27/09/2026 Jonathan confirmou que era
   outubro/2025; corrigido no bloco 16.*
@@ -252,12 +287,8 @@ sobre agregações que depois mudam.
 
 Ordem decidida por Jonathan na auditoria de 27/09/2026:
 
-1. **Rodada do histórico.** Tirar o legado da tela do mês; a tela de
-   histórico lista todos os meses, de novembro/2024 em diante — o legado até
-   agosto/2026, o app de setembro/2026 em diante (setembro está nos dois e
-   vale o do app). Mês antigo abre o detalhe dentro do histórico. O total de
-   cada mês antigo é calculado no banco, para os gráficos reaproveitarem. As
-   contas riscadas aparecem separadas, nunca somadas em silêncio.
+1. ~~**Rodada do histórico.**~~ **Feita no bloco 17**; falta Jonathan mesclar
+   a branch e conferir a tela de histórico no aparelho.
 2. **Rodada dos gráficos**, sobre o histórico já correto: desde o início do
    controle.
 3. **"Parcelar" direto no lançamento** e **UX do código de pagamento**.
