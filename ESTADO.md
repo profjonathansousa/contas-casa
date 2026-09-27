@@ -4,7 +4,8 @@ Atualizado em 27/09/2026 — auditoria de retomada; bloco 16 (correções de
 dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
 27/09/2026; bloco 18 (os gráficos desde o início) no ar desde 27/09/2026; bloco 19
 ("parcelar" direto na conta do mês) no ar desde 27/09/2026; bloco 20 (UX do
-código de pagamento) na branch, sem mudança no banco.
+código de pagamento) no ar desde 27/09/2026. A lista da auditoria de 27/09
+está completa.
 
 ## ESTADO ATUAL
 
@@ -136,7 +137,7 @@ código de pagamento) na branch, sem mudança no banco.
     O DOM da bancada não propaga eventos; a medida do "segurar" simula a
     propagação, senão não enxergaria o defeito.
 - **Bloco 20 — UX do código de pagamento**, como desenhado na auditoria.
-  Só tela; o banco não muda.
+  Só tela; o banco não muda. No ar em 27/09/2026.
   - O chip diz o que copia: **"copiar código PIX"**, **"copiar código do
     boleto"**, **"copiar código da conta"**. Evita colar PIX no campo de
     boleto do banco. Depois do "copiado ✓", volta ao rótulo do tipo.
@@ -384,7 +385,7 @@ Ordem decidida por Jonathan na auditoria de 27/09/2026:
    conferir no aparelho.
 3. ~~**"Parcelar" direto no lançamento**~~ **feito no bloco 19, no ar em
    27/09**, falta conferir no aparelho; ~~**UX do código de pagamento**~~
-   **feita no bloco 20**, falta o merge.
+   **feita no bloco 20, no ar em 27/09**, falta conferir no aparelho.
 4. **01/10: abrir o app** e conferir que outubro nasceu sozinho.
 5. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
    ou no mecanismo de `postgres_changes`.
