@@ -2,14 +2,14 @@
    Guarda só os arquivos do próprio app. Nada do Supabase é cacheado — dado de
    conta tem que vir do servidor, senão a tela mente. Fila offline é fase 2. */
 
-var VERSAO = 'nossas-contas-v10';
+var VERSAO = 'nossas-contas-v11';
 // Os três arquivos que mudam levam versão no endereço. Não é enfeite: em
 // 05/09/2026 o app entregou duas vezes a tela nova rodando o código velho,
 // porque HTML e JS vencem em relógios diferentes no cache. Endereço novo é a
 // única garantia — nenhum cache tem como servir o que nunca pediram.
 // Ao mudar o ?v=, mude nos DOIS arquivos: a bancada confere que batem.
 var CASCA = [
-  './', './index.html', './app.css?v=16', './app.js?v=16', './config.js?v=10',
+  './', './index.html', './app.css?v=17', './app.js?v=17', './config.js?v=10',
   './vendor/supabase.js', './manifest.webmanifest',
   './icones/icone-192.png', './icones/icone-512.png',
   './icones/icone-maskable-512.png', './icones/apple-touch-icon.png'

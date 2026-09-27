@@ -38,6 +38,8 @@ var el = {
   fundoParcelas: $('#fundo-parcelas'), folhaParcelas: $('#folha-parcelas'),
   pcDesc: $('#pc-desc'), pcTotal: $('#pc-total'), pcMes: $('#pc-mes'),
   pcCancelar: $('#pc-cancelar'), erroParcelas: $('#erro-parcelas'),
+  pcTitulo: $('#pc-titulo'), pcNotaFixa: $('#pc-nota-fixa'),
+  pcNotaConta: $('#pc-nota-conta'), pcLeitura: $('#pc-leitura'), pcSalvar: $('#pc-salvar'),
   fundoCodigo: $('#fundo-codigo'), folhaCodigo: $('#folha-codigo'),
   cdDesc: $('#cd-desc'), cdTexto: $('#cd-texto'), cdLeitura: $('#cd-leitura'),
   cdTirar: $('#cd-tirar'), erroCodigo: $('#erro-codigo'),
@@ -935,6 +937,7 @@ function linha(it) {
   valor.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
 
   corpo.appendChild(chipCodigo(it));
+  if (it.parcela_n == null) corpo.appendChild(chipParcelar(it));
 
   ligarToques(div, function () { alternarPago(it); }, function () { pedirApagar(it, 'lancamento'); });
 
@@ -959,6 +962,20 @@ function chipCodigo(it) {
   ligarToques(b,
     function () { if (it.codigo_pagamento) copiarCodigo(it, b); else abrirCodigo(it); },
     function () { abrirCodigo(it); });
+  return b;
+}
+
+// Parcelar sai da própria linha: a conta digitada à mão vira fixa com janela
+// de parcelas, sem passar pela tela de contas fixas. Só aparece em conta que
+// ainda não diz que parcela é; a que já diz se ajusta em contas fixas.
+function chipParcelar(it) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'acao-parcelar';
+  b.textContent = 'parcelar';
+  // nem o toque vira "pago", nem segurar vira "apagar"
+  b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+  b.addEventListener('click', function (ev) { ev.stopPropagation(); abrirParcelar(it); });
   return b;
 }
 
@@ -1595,33 +1612,115 @@ function rotuloParcela(m) {
   return ' · parcela ' + n + ' de ' + m.parcelas_total;
 }
 
+// A mesma folha serve a dois donos: a conta fixa (tela de contas fixas) e a
+// conta do mês (chip "parcelar"). Só um dos dois está preenchido por vez.
 var fixaEmEdicao = null;
-function abrirParcelas(m) {
-  fixaEmEdicao = m;
-  el.pcDesc.textContent = m.descricao;
-  el.pcTotal.value = m.parcelas_total == null ? '' : String(m.parcelas_total);
-  el.pcMes.value = deCompetencia(m.parcela_1);
+var contaEmParcelar = null;
+function mostrarFolhaParcelas(titulo, daConta) {
+  el.pcTitulo.textContent = titulo;
+  el.pcNotaFixa.hidden = daConta;
+  el.pcNotaConta.hidden = !daConta;
+  el.pcLeitura.hidden = true;
   el.erroParcelas.hidden = true;
   el.fundoParcelas.hidden = false;
   el.folhaParcelas.hidden = false;
 }
+function abrirParcelas(m) {
+  fixaEmEdicao = m;
+  contaEmParcelar = null;
+  el.pcDesc.textContent = m.descricao;
+  el.pcTotal.value = m.parcelas_total == null ? '' : String(m.parcelas_total);
+  el.pcMes.value = deCompetencia(m.parcela_1);
+  mostrarFolhaParcelas('Conta que acaba', false);
+}
+// O mês da primeira já vem com o mês desta conta: é o caso de "começa agora".
+// Se ela já é a 3ª, a pessoa volta dois meses, e a leitura diz na hora.
+function abrirParcelar(it) {
+  contaEmParcelar = it;
+  fixaEmEdicao = null;
+  el.pcDesc.textContent = it.descricao;
+  el.pcTotal.value = '';
+  el.pcMes.value = deCompetencia(it.competencia);
+  mostrarFolhaParcelas('Parcelar', true);
+}
 function fecharParcelas() {
   fixaEmEdicao = null;
+  contaEmParcelar = null;
   el.fundoParcelas.hidden = true;
   el.folhaParcelas.hidden = true;
 }
+
+// A conta de cabeça que ninguém devia precisar fazer: com estes números, que
+// parcela é a deste mês, e quando cai a última. Pura, para a bancada medir.
+function leituraParcelar(total, mes, competencia) {
+  if (!(total >= 1 && total <= 360) || typeof mes !== 'string') return null;
+  var n = parcelaNoMes({ parcelas_total: total, parcela_1: mes }, competencia);
+  if (n < 1 || n > total) {
+    return { bom: false, texto: 'Assim, a conta deste mês seria a parcela ' + n + ' de '
+             + total + ' — fora do intervalo. Confira o mês da primeira.' };
+  }
+  return { bom: true, n: n, texto: 'Esta conta vira a parcela ' + n + ' de ' + total
+           + '; a última cai em ' + deCompetencia(andarMes(mes, total - 1)) + '.' };
+}
+function mostrarLeituraParcelar() {
+  if (!contaEmParcelar) return;
+  var bruto = String(el.pcTotal.value).trim();
+  var r = leituraParcelar(bruto === '' ? null : parseInt(bruto, 10),
+                          paraCompetencia(el.pcMes.value), contaEmParcelar.competencia);
+  el.pcLeitura.hidden = !r;
+  if (!r) return;
+  el.pcLeitura.textContent = r.texto;
+  el.pcLeitura.className = 'cd-leitura ' + (r.bom ? 'bom' : 'ruim');
+}
+el.pcTotal.addEventListener('input', mostrarLeituraParcelar);
+el.pcMes.addEventListener('input', mostrarLeituraParcelar);
+
 // Sair do campo mostra o que o app entendeu: quem digitou 92026 vê 09/2026 e
 // sabe que acertou, sem precisar salvar para descobrir.
 el.pcMes.addEventListener('blur', function () {
   var c = paraCompetencia(el.pcMes.value);
   if (typeof c === 'string') el.pcMes.value = deCompetencia(c);
+  mostrarLeituraParcelar();
 });
 
 el.pcCancelar.addEventListener('click', fecharParcelas);
 el.fundoParcelas.addEventListener('click', fecharParcelas);
 
+// Parcelar a conta do mês é uma chamada só ao banco: a fixa (criada ou
+// reaproveitada) e a conta do mês mudam juntas, ou não mudam.
+async function salvarParcelar(it) {
+  function erro(txt) { el.erroParcelas.textContent = txt; el.erroParcelas.hidden = false; }
+  el.erroParcelas.hidden = true;
+
+  var bruto = String(el.pcTotal.value).trim();
+  var total = bruto === '' ? null : parseInt(bruto, 10);
+  var mes = paraCompetencia(el.pcMes.value);
+
+  if (typeof mes === 'number' && isNaN(mes)) { erro('Não entendi o mês. Use 09/2026 ou 092026.'); return; }
+  if (!(total >= 1 && total <= 360)) { erro('Quantas parcelas? Um número de 1 a 360.'); return; }
+  if (mes === null) { erro('Falta o mês da primeira parcela.'); return; }
+  var leitura = leituraParcelar(total, mes, it.competencia);
+  if (!leitura.bom) { erro(leitura.texto); return; }
+
+  el.pcSalvar.disabled = true;
+  var r = await db.rpc('parcelar_lancamento',
+    { p_lancamento: it.id, p_parcelas_total: total, p_parcela_1: mes });
+  el.pcSalvar.disabled = false;
+  if (r.error) { erro('Não deu para parcelar. ' + r.error.message); return; }
+
+  var feito = (r.data && r.data[0]) || { parcela_n: leitura.n, parcela_de: total };
+  it.parcela_n = feito.parcela_n;
+  it.parcela_de = feito.parcela_de;
+  fecharParcelas();
+  await carregarModelos();       // a fixa nova conta para o "Trazer N contas fixas"
+  desenhar();
+  aviso((feito.criou_fixa ? 'Virou conta fixa, ' : 'Parcelada, ')
+        + feito.parcela_n + '/' + feito.parcela_de + '. As próximas vêm sozinhas.');
+}
+
 el.folhaParcelas.addEventListener('submit', async function (ev) {
   ev.preventDefault();
+  if (contaEmParcelar) { await salvarParcelar(contaEmParcelar); return; }
   var m = fixaEmEdicao;
   if (!m) return;
   function erro(txt) { el.erroParcelas.textContent = txt; el.erroParcelas.hidden = false; }

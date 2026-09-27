@@ -967,6 +967,104 @@ canalRec.inscricoes[1].fn({ eventType: 'INSERT', new: {
 medir('receita atual entrou pelo Realtime', receitasDesenhadas().length, nRecAntesEvento + 1);
 medir('nova receita aparece', !!receitaAtual('Reembolso'), true);
 
+print('\n== 24. parcelar direto na conta do mes ==');
+function chipParcelarDe(item) { return partesDo(item, 'acao-parcelar')[0]; }
+function mmaaaa(c) { return c.slice(5, 7) + '/' + c.slice(0, 4); }
+function voltaMeses(c, n) {
+  var p = c.split('-'); var d = new Date(+p[0], +p[1] - 1 - n, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+}
+medir('conta sem parcela oferece parcelar', chipParcelarDe(itemPorDesc('Luz'))._txt, 'parcelar');
+medir('conta que ja e parcela nao oferece', chipParcelarDe(itemPorDesc('Cartao azul')), undefined);
+medir('o chip de codigo continua o primeiro', partesDo(itemPorDesc('Luz'), 'codigo')[0]._txt, '+ código');
+
+print('  (tocar no chip NAO marca pago; segurar NAO apaga)');
+print('  (o DOM da bancada nao propaga eventos; aqui a propagacao e simulada:');
+print('   o evento so chega a linha se o chip nao o interromper)');
+function comBolha(alvo, linhaDoItem, nome) {
+  var parou = false;
+  var ev = { preventDefault: function () {}, stopPropagation: function () { parou = true; },
+             clientX: 0, clientY: 0 };
+  alvo.disparar(nome, ev);
+  if (!parou) linhaDoItem.disparar(nome, ev);
+}
+var upParc = LOG.updates.length, rpcParc = LOG.rpcs.length;
+comBolha(chipParcelarDe(itemPorDesc('Luz')), itemPorDesc('Luz'), 'pointerdown');
+avancarTempo(700);
+comBolha(chipParcelarDe(itemPorDesc('Luz')), itemPorDesc('Luz'), 'click');
+esperar();
+medir('nao marcou pago', LOG.updates.length - upParc, 0);
+medir('nao pediu para apagar', q('#folha-apagar').hidden, true);
+medir('abriu a folha de parcelar', q('#folha-parcelas').hidden, false);
+medir('titulo e parcelar', q('#pc-titulo')._txt, 'Parcelar');
+medir('explicacao da conta, nao da fixa', [q('#pc-nota-conta').hidden, q('#pc-nota-fixa').hidden], [false, true]);
+medir('diz qual conta', q('#pc-desc')._txt, 'Luz');
+medir('mes da primeira vem com o mes da conta', [q('#pc-total').value, q('#pc-mes').value],
+      ['', mmaaaa(MESHOJE)]);
+
+print('  -- a leitura diz que parcela sera, antes de salvar --');
+var primeira = voltaMeses(MESHOJE, 2);
+q('#pc-total').value = '10';
+q('#pc-mes').value = mmaaaa(primeira).replace('/', '');   // do teclado numerico, sem barra
+q('#pc-mes').disparar('input');
+medir('esta vira a 3a de 10, e diz quando acaba', q('#pc-leitura')._txt,
+      'Esta conta vira a parcela 3 de 10; a última cai em ' + mmaaaa(voltaMeses(primeira, -9)) + '.');
+medir('em tom de confirmacao', q('#pc-leitura').className, 'cd-leitura bom');
+
+print('  -- CONTROLE NEGATIVO: primeira depois desta conta --');
+q('#pc-mes').value = mmaaaa(voltaMeses(MESHOJE, -1));
+q('#pc-mes').disparar('input');
+medir('avisa que fica fora', q('#pc-leitura').className, 'cd-leitura ruim');
+var rpcAntesRecusa = LOG.rpcs.length;
+q('#folha-parcelas').disparar('submit');
+esperar();
+medir('nao chamou o banco', LOG.rpcs.length - rpcAntesRecusa, 0);
+medir('e disse por que', q('#erro-parcelas')._txt.indexOf('parcela 0 de 10') >= 0, true);
+medir('folha continua aberta', q('#folha-parcelas').hidden, false);
+q('#pc-total').value = '';
+q('#pc-mes').value = mmaaaa(MESHOJE);
+q('#folha-parcelas').disparar('submit');
+esperar();
+print('  (vazio, que na fixa quer dizer "para sempre", aqui nao faz sentido)');
+medir('sem quantas parcelas nao salva', q('#erro-parcelas')._txt, 'Quantas parcelas? Um número de 1 a 360.');
+medir('e nao chamou o banco', LOG.rpcs.length - rpcAntesRecusa, 0);
+
+print('  -- o banco recusa: a folha fica aberta e mostra a razao --');
+RESPOSTA_PARCELAR.erro = 'Já existe outra conta deste mês ligada à conta fixa "Luz".';
+q('#pc-total').value = '10';
+q('#pc-mes').value = mmaaaa(primeira);
+q('#folha-parcelas').disparar('submit');
+esperar();
+medir('mensagem do banco na folha', q('#erro-parcelas')._txt,
+      'Não deu para parcelar. Já existe outra conta deste mês ligada à conta fixa "Luz".');
+medir('folha aberta', q('#folha-parcelas').hidden, false);
+medir('a linha nao mudou', partesDo(itemPorDesc('Luz'), 'parcela').length, 0);
+delete RESPOSTA_PARCELAR.erro;
+
+print('  -- salvar: uma chamada so, com os tres numeros --');
+var rpcSalvar = LOG.rpcs.length, selSalvar = LOG.selects.length;
+q('#folha-parcelas').disparar('submit');
+esperar();
+medir('uma RPC', LOG.rpcs.length - rpcSalvar, 1);
+medir('e a de parcelar', LOG.rpcs[rpcSalvar].nome, 'parcelar_lancamento');
+medir('com a conta, o total e a primeira', LOG.rpcs[rpcSalvar].args,
+      { p_lancamento: 'l2', p_parcelas_total: 10, p_parcela_1: primeira });
+medir('nenhum update direto', LOG.updates.length - upParc, 0);
+medir('folha fechou', q('#folha-parcelas').hidden, true);
+medir('a linha mostra 3/10', partesDo(itemPorDesc('Luz'), 'parcela')[0]._txt, '3/10');
+medir('e o chip sumiu', chipParcelarDe(itemPorDesc('Luz')), undefined);
+medir('releu as fixas', LOG.selects.slice(selSalvar).some(function (s) { return s.tabela === 'modelo'; }), true);
+medir('diz o que aconteceu', q('#aviso')._txt, 'Virou conta fixa, 3/10. As próximas vêm sozinhas.');
+
+print('  -- a mesma folha, aberta pela fixa, volta a ser da fixa --');
+abrirFixas();
+fixaPorDesc('Condominio').filhos[1].filhos[1].disparar('click');
+medir('titulo da fixa', q('#pc-titulo')._txt, 'Conta que acaba');
+medir('explicacao da fixa', [q('#pc-nota-conta').hidden, q('#pc-nota-fixa').hidden], [true, false]);
+medir('sem leitura de conta', q('#pc-leitura').hidden, true);
+q('#pc-cancelar').disparar('click');
+voltarDasFixas();
+
 print('\n  -- logout limpa o cache de receitas --');
 var chaveReceitas = 'receitas:' + CASA + ':' + MESHOJE;
 print('  (o app nao grava mais cache de legado; o que sobrou num aparelho antigo');

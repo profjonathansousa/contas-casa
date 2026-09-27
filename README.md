@@ -50,7 +50,9 @@ CONTAS_CASA/
 │   ├── 17_historico_completo.sql  o histórico numa tela só: app + arquivo antigo
 │   ├── 17_prova_historico_completo.sql  prova do bloco 17
 │   ├── 18_graficos_desde_o_inicio.sql  gráficos com o arquivo antigo
-│   └── 18_prova_graficos.sql      prova do bloco 18 (substitui a do 12)
+│   ├── 18_prova_graficos.sql      prova do bloco 18 (substitui a do 12)
+│   ├── 19_parcelar_lancamento.sql  "parcelar" direto na conta do mês
+│   └── 19_prova_parcelar.sql      prova do bloco 19
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -98,6 +100,13 @@ diga quantas vezes e o mês da primeira — no mês dá para digitar só os núm
 vale, mostra "5/12" na tela do mês, e **para de ser oferecida quando a última
 passou**. Deixar os dois campos vazios é o normal: conta que se repete para
 sempre.
+
+**Parcelar de onde a conta está.** Na tela do mês, o **"parcelar"** ao lado
+do "+ código" faz o mesmo sem passar pela tela de contas fixas: diga quantas
+vezes e o mês da primeira (ele já vem com o mês da conta; se ela já é a 3ª,
+volte dois meses), e o app mostra na hora que parcela ela vira e quando cai a
+última. Ao salvar, ela vira conta fixa com essas parcelas — ou reaproveita a
+fixa de mesmo nome, se houver — e os meses seguintes vêm sozinhos.
 
 O contador mora em coluna própria, não na descrição — descrição que muda todo
 mês faria a mesma conta entrar de novo toda vez, porque é por descrição que o
@@ -159,7 +168,7 @@ iPhone, porque o app instalado não enxerga a sessão do Safari.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
  onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 280 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 313 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -247,7 +256,7 @@ Os blocos **1 a 15** estão concluídos, e o **Bloco 12** também. O `sql/11` fo
 07/09/2026 e a prova SQL passou. O `sql/14` também foi aplicado e provado em
 produção. O `sql/15` foi aplicado e provado, e o histórico legado real foi
 importado. O `sql/12` de gráficos também foi aplicado e provado. A bancada
-fecha em `280 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+fecha em `313 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
   recuperação de senha) estão implementados e no ar.

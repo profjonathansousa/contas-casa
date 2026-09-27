@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
 <link rel="icon" href="icones/icone-192.png">
-<link rel="stylesheet" href="app.css?v=16">
+<link rel="stylesheet" href="app.css?v=17">
 </head>
 <body>
 
@@ -184,11 +184,15 @@
 <!-- ---------- conta fixa que acaba ---------- -->
 <div id="fundo-parcelas" class="fundo" hidden></div>
 <form id="folha-parcelas" class="folha" hidden>
-  <h2>Conta que acaba</h2>
+  <h2 id="pc-titulo">Conta que acaba</h2>
   <p id="pc-desc" class="ap-desc"></p>
-  <p class="ap-nota">Quantas vezes ela vem, e o mês da primeira — no mês dá para
+  <p id="pc-nota-fixa" class="ap-nota">Quantas vezes ela vem, e o mês da primeira — no mês dá para
     digitar só os números: <b>092026</b> vira 09/2026. Deixe os dois vazios se
     ela se repete para sempre.</p>
+  <p id="pc-nota-conta" class="ap-nota" hidden>Quantas vezes ela vem, e o mês da
+    primeira — se esta já é a 3ª, a primeira foi dois meses antes. No mês dá
+    para digitar só os números: <b>092026</b> vira 09/2026. As próximas vêm
+    sozinhas nos meses seguintes, e ela aparece em contas fixas.</p>
   <div class="dupla">
     <div>
       <label for="pc-total">Quantas parcelas</label>
@@ -199,6 +203,7 @@
       <input id="pc-mes" type="text" inputmode="numeric" placeholder="mm/aaaa">
     </div>
   </div>
+  <p id="pc-leitura" class="cd-leitura" hidden></p>
   <div class="botoes">
     <button type="button" id="pc-cancelar" class="secundario">Cancelar</button>
     <button type="submit" id="pc-salvar">Salvar</button>
@@ -248,6 +253,6 @@
 
 <script src="vendor/supabase.js"></script>
 <script src="config.js?v=10"></script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

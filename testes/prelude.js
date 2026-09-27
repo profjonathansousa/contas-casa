@@ -83,6 +83,10 @@ var MES = (function () { var d = new Date(); return d.getFullYear() + '-' + Stri
 // muda isto para provar que a competência do SERVIDOR vence o palpite do
 // aparelho.
 var RESPOSTA_GARANTIR = { competencia: MES, criadas: 0 };
+// O que parcelar_lancamento() devolve. A conta de verdade (que parcela é, se
+// cria fixa) é do banco e está provada no sql/19; aqui só se mede o que o app
+// faz com a resposta. Com .erro, o banco recusa.
+var RESPOSTA_PARCELAR = { modelo_id: 'm-novo', parcela_n: 3, parcela_de: 10, criou_fixa: true };
 
 var ID_EU = 'aaaaaaaa-0000-0000-0000-000000000001';
 var ID_OUTRO = 'bbbbbbbb-0000-0000-0000-000000000002';
@@ -275,6 +279,10 @@ var supabase = {
                               criadas:     RESPOSTA_GARANTIR.criadas }], error: null };
           }
           if (nome === 'gerar_mes') return { data: 1, error: null };
+          if (nome === 'parcelar_lancamento') {
+            if (RESPOSTA_PARCELAR.erro) return { data: null, error: { message: RESPOSTA_PARCELAR.erro } };
+            return { data: [RESPOSTA_PARCELAR], error: null };
+          }
           if (nome === 'historico') return { data: HISTORICO, error: null };
           if (nome === 'historico_completo') {
             return { data: HISTORICO.map(function (h) {
