@@ -2,7 +2,8 @@
 
 Atualizado em 27/09/2026 — auditoria de retomada; bloco 16 (correções de
 dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
-27/09/2026. Próxima rodada: os gráficos.
+27/09/2026; bloco 18 (os gráficos desde o início) com o SQL aplicado e o app
+na branch.
 
 ## ESTADO ATUAL
 
@@ -60,11 +61,43 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
     tabela, lista em ordem, e o controle negativo (sem perfil) vê 0 meses.
   - Achado para a rodada dos gráficos: três meses antigos têm "a pagar"
     diferente de zero — itens sem marca de pago nem de riscado no arquivo.
-  - Bancada: **261 / 4 / 27 / 49**, 0 falhas. O controle negativo foi feito
+  - Bancada: **280 / 4 / 27 / 49**, 0 falhas. O controle negativo foi feito
     numa cópia: com a seção e a leitura do legado de volta na tela do mês,
     três medidas ficam vermelhas. O `localStorage` falso da bancada ganhou
     `length` e `key()`, como o do navegador: sem isso o logout era medido
     pelo caminho que nenhum aparelho usa.
+- **Bloco 18 — os gráficos desde o início do controle**
+  (`sql/18_graficos_desde_o_inicio.sql`, prova em `sql/18_prova_graficos.sql`,
+  que substitui a do bloco 12). SQL aplicado e provado em 27/09/2026.
+  - `graficos()` lê as despesas de `historico_completo()`: mesma regra de
+    corte e mesma conta por mês da tela de histórico. Ganha `origem`,
+    `despesa_riscada` e `despesa_riscadas`; `saldo` fica **nulo** em mês do
+    arquivo antigo, que quase não tem receitas — ali o "saldo" seria só a
+    despesa com o sinal trocado.
+  - **Despesas por mês** vem primeiro, de novembro/2024 até hoje, do mais
+    antigo ao mais recente. Cada mês é uma barra empilhada: verde, o que era
+    acompanhado; roxo, colado a ela, o que foi riscado. O comprimento inteiro
+    é o que a casa gastou. As duas versões ficam visíveis ao mesmo tempo —
+    era a decisão adiada no bloco 17, e ela não precisou ser tomada. Tocar
+    no mês mostra os números por extenso.
+  - **Receitas × despesas × saldo, Pago × a pagar e Valor em aberto** são
+    só dos meses do app. Nos meses antigos, "a pagar" é o que ficou sem
+    marca no arquivo, não conta em aberto — e é isso que resolve o achado dos
+    três meses antigos com "a pagar" diferente de zero.
+  - Cores do par empilhado validadas pelo script de paleta (daltonismo,
+    faixa de luminosidade, contraste) no claro e no escuro, em tokens
+    próprios (`--graf-acomp`, `--graf-risc`); o `--pago` do resto do app não
+    mudou.
+  - Provado no banco: 23 meses, 10 com riscada (9% do gasto do período), a
+    mesma conta da tela de histórico mês a mês, nenhum saldo em mês antigo,
+    nenhuma receita caindo em mês antigo, e o controle negativo vê 0 meses.
+  - Bancada **280 / 4 / 27 / 49**, 0 falhas. Controle negativo numa cópia:
+    com o mês antigo vazando para os cartões do app e a escala ignorando a
+    riscada, sete medidas ficam vermelhas.
+  - **Janela entre o SQL e o merge:** a `graficos()` nova já está no banco,
+    e o app publicado ainda é o do bloco 17, que soma todas as linhas. Até o
+    merge, a tela de gráficos em produção mistura o arquivo antigo nos
+    totais. Nada quebra (a tela só lê), mas os números ficam errados ali.
 - **Rodapé que empurrava a página para o lado**, achado na captura do bloco
   17 e corrigido no mesmo dia: desde o bloco 12 eram cinco links numa linha
   só, mais largos que um iPhone. Agora quebram em duas linhas, cada link
@@ -92,7 +125,7 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
   aprovado e o histórico real importado em tabelas próprias.
 - Bloco **12** (gráficos) **implementado e provado no banco**:
   `sql/12_graficos.sql` aplicado e `sql/12_prova_graficos.sql` aprovado.
-- Bancada verde em **261 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bancada verde em **280 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.
@@ -294,8 +327,8 @@ Ordem decidida por Jonathan na auditoria de 27/09/2026:
 
 1. ~~**Rodada do histórico.**~~ **Feita no bloco 17, no ar em 27/09**; falta
    conferir a tela de histórico no aparelho.
-2. **Rodada dos gráficos**, sobre o histórico já correto: desde o início do
-   controle.
+2. ~~**Rodada dos gráficos**~~ **Feita no bloco 18**; falta o merge e
+   conferir no aparelho.
 3. **"Parcelar" direto no lançamento** e **UX do código de pagamento**.
 4. **01/10: abrir o app** e conferir que outubro nasceu sozinho.
 5. **Manter a validação manual de Realtime** a cada mudança que tocar na tela

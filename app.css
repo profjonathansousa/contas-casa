@@ -11,6 +11,9 @@
   --pago:       #157a4a;
   --pago-fundo: #e8f5ec;
   --alerta:     #a3341f;
+  /* par do gráfico empilhado, validado para daltonismo no claro e no escuro */
+  --graf-acomp: #157a4a;
+  --graf-risc:  #7a5cc4;
   --raio:       14px;
   --topo-h:     0px;
 }
@@ -25,6 +28,8 @@
     --pago-fundo: #14301f;
     --pago:       #5fd196;
     --alerta:     #ff8a70;
+    --graf-acomp: #34a066;
+    --graf-risc:  #8a70dc;
   }
 }
 
@@ -294,6 +299,23 @@ button { border: 0; background: none; cursor: pointer; }
 }
 .graf-pago { background: var(--pago); }
 .graf-apagar { background: var(--alerta); }
+
+/* despesas por mês: barra empilhada, um mês por linha */
+.graf-nota { margin: -4px 0 8px; font-size: 13px; color: var(--fraco); }
+.graf-legenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 6px;
+                font-size: 13px; color: var(--fraco); }
+.graf-legenda > span { display: inline-flex; align-items: center; gap: 6px; }
+.graf-amostra { width: 10px; height: 10px; border-radius: 3px; }
+.graf-acomp { background: var(--graf-acomp); }
+.graf-risc { background: var(--graf-risc); }
+.graf-mes { width: 100%; flex-wrap: wrap; text-align: left; padding: 3px 0; margin: 2px 0; }
+.graf-mes .graf-rotulo { width: 46px; }
+.graf-pilha { display: flex; gap: 2px; background: transparent; border-radius: 0; }
+.graf-pilha .graf-preenchida { border-radius: 0; }
+.graf-pilha .graf-preenchida:last-child { border-radius: 0 4px 4px 0; }
+.graf-valor { flex: none; width: 76px; text-align: right; font-size: 13px;
+              color: var(--fraco); font-variant-numeric: tabular-nums; }
+.graf-detalhe { flex-basis: 100%; margin: 4px 0 2px 54px; font-size: 13px; color: var(--texto); }
 
 /* conta fixa desligada: continua legível, mas claramente fora do ar */
 .item.desligado { opacity: .45; }

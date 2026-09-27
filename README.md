@@ -48,7 +48,9 @@ CONTAS_CASA/
 │   ├── 16_correcoes_de_dados.sql  outubro/2025 no legado; marca de outubro/2026
 │   ├── 16_prova_correcoes.sql     prova do bloco 16
 │   ├── 17_historico_completo.sql  o histórico numa tela só: app + arquivo antigo
-│   └── 17_prova_historico_completo.sql  prova do bloco 17
+│   ├── 17_prova_historico_completo.sql  prova do bloco 17
+│   ├── 18_graficos_desde_o_inicio.sql  gráficos com o arquivo antigo
+│   └── 18_prova_graficos.sql      prova do bloco 18 (substitui a do 12)
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -157,7 +159,7 @@ iPhone, porque o app instalado não enxerga a sessão do Safari.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
  onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 261 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 280 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -245,7 +247,7 @@ Os blocos **1 a 15** estão concluídos, e o **Bloco 12** também. O `sql/11` fo
 07/09/2026 e a prova SQL passou. O `sql/14` também foi aplicado e provado em
 produção. O `sql/15` foi aplicado e provado, e o histórico legado real foi
 importado. O `sql/12` de gráficos também foi aplicado e provado. A bancada
-fecha em `261 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+fecha em `280 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
   recuperação de senha) estão implementados e no ar.
@@ -255,8 +257,12 @@ fecha em `261 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
   uma tabela separada, e `receitas_mensais()` resume cada competência.
 - Bloco **15** (histórico legado) está implementado e provado: três tabelas
   históricas, importação controlada e leitura separada da operação corrente.
-- Bloco **12** (gráficos) está implementado e provado: `graficos()` agrega
-  despesas e receitas correntes, sem incluir o histórico legado.
+- Bloco **12** (gráficos), refeito no bloco **18**: as despesas vêm desde
+  novembro/2024, com o arquivo antigo, cada mês numa barra empilhada — o que
+  era acompanhado e, colado, o que foi riscado. Receitas, saldo e valor em
+  aberto continuam só dos meses do app.
+- Blocos **16** e **17**: correções de dados do arquivo antigo e o histórico
+  numa tela só — todos os meses na tela de histórico, nenhum na do mês.
 - **Realtime entre dois aparelhos** foi validado manualmente: a mudança feita
   num aparelho aparece no outro praticamente imediatamente. A bancada cobre o
   lado local; a validação manual cobre a travessia da rede.

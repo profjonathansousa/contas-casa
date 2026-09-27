@@ -1377,28 +1377,115 @@ function barraGrafico(rotulo, valor, max, classe) {
   return linha;
 }
 
+var MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun',
+                    'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+function mesCurto(c) { var p = c.split('-'); return MESES_CURTOS[+p[1] - 1] + '/' + p[0].slice(2); }
+
+function notaGrafico(texto) {
+  var p = document.createElement('p');
+  p.className = 'graf-nota';
+  p.textContent = texto;
+  return p;
+}
+
+function legendaGrafico() {
+  var div = document.createElement('div');
+  div.className = 'graf-legenda';
+  [['graf-acomp', 'acompanhadas'], ['graf-risc', 'riscadas, fora do controle']]
+    .forEach(function (par) {
+      var item = document.createElement('span');
+      var cor = document.createElement('span');
+      cor.className = 'graf-amostra ' + par[0];
+      var nome = document.createElement('span');
+      nome.textContent = par[1];
+      item.appendChild(cor);
+      item.appendChild(nome);
+      div.appendChild(item);
+    });
+  return div;
+}
+
+// Um mês, uma barra: a parte acompanhada e, colada a ela, a riscada. O
+// comprimento inteiro é o que a casa gastou; a parte verde é o que estava no
+// controle. Assim as duas versões aparecem juntas, sem escolher uma. Tocar na
+// linha abre os números, porque no telefone não existe passar o mouse.
+function barraMes(g, max) {
+  var acomp = Number(g.despesa_prevista) || 0;
+  var risc = Number(g.despesa_riscada) || 0;
+  var linha = document.createElement('button');
+  linha.type = 'button';
+  linha.className = 'graf-linha graf-mes';
+
+  var rot = document.createElement('span');
+  rot.className = 'graf-rotulo';
+  rot.textContent = mesCurto(g.competencia);
+  var trilho = document.createElement('span');
+  trilho.className = 'graf-trilho graf-pilha';
+  var a = document.createElement('span');
+  a.className = 'graf-preenchida graf-acomp';
+  a.style.width = (max > 0 ? acomp / max * 100 : 0) + '%';
+  trilho.appendChild(a);
+  if (risc > 0) {
+    var r = document.createElement('span');
+    r.className = 'graf-preenchida graf-risc';
+    r.style.width = (risc / max * 100) + '%';
+    trilho.appendChild(r);
+  }
+  var valor = document.createElement('span');
+  valor.className = 'graf-valor';
+  valor.textContent = reais(acomp + risc);
+
+  var detalhe = document.createElement('span');
+  detalhe.className = 'graf-detalhe';
+  detalhe.hidden = true;
+  detalhe.textContent = rotuloMes(g.competencia) + ': R$ ' + reais(acomp) + ' acompanhadas'
+    + (risc > 0 ? ' + R$ ' + reais(risc) + ' riscadas' : '')
+    + (g.origem === 'legado' ? ' · arquivo antigo' : '');
+
+  linha.appendChild(rot);
+  linha.appendChild(trilho);
+  linha.appendChild(valor);
+  linha.appendChild(detalhe);
+  linha.addEventListener('click', function () { detalhe.hidden = !detalhe.hidden; });
+  return linha;
+}
+
 function desenharGraficos() {
   el.grafLista.textContent = '';
   if (graficos.length === 0) {
     var vazio = document.createElement('p');
     vazio.className = 'vazio-mes';
-    vazio.textContent = 'Ainda não há despesas nem receitas correntes para exibir.';
+    vazio.textContent = 'Ainda não há despesas para exibir.';
     el.grafLista.appendChild(vazio);
     return;
   }
 
-  var receitaRecebida = 0, receitaTotal = 0, despesaPaga = 0;
-  var despesaPrevista = 0, despesaAPagar = 0, despesaSemValor = 0;
-  graficos.forEach(function (g) {
+  // Do mais antigo para o mais recente: a evolução se lê de cima para baixo.
+  var meses = graficos.slice().reverse();
+  var max = Math.max.apply(null, meses.map(function (g) {
+    return (Number(g.despesa_prevista) || 0) + (Number(g.despesa_riscada) || 0);
+  }).concat([1]));
+  var cartaoDespesa = cartaoGrafico('Despesas por mês');
+  cartaoDespesa.appendChild(notaGrafico('Desde ' + rotuloMes(meses[0].competencia).toLowerCase()
+    + ', com o arquivo antigo. Toque num mês para ver os números.'));
+  cartaoDespesa.appendChild(legendaGrafico());
+  meses.forEach(function (g) { cartaoDespesa.appendChild(barraMes(g, max)); });
+  el.grafLista.appendChild(cartaoDespesa);
+
+  // O resto é controle ao vivo: só os meses do app. O arquivo antigo quase não
+  // tem receitas, e "em aberto" num mês fechado de 2025 não quer dizer nada.
+  var doApp = graficos.filter(function (g) { return g.origem !== 'legado'; });
+  if (doApp.length === 0) return;
+  var receitaRecebida = 0, despesaPaga = 0, despesaAPagar = 0;
+  doApp.forEach(function (g) {
     receitaRecebida += Number(g.receita_recebida) || 0;
-    receitaTotal += Number(g.receita_total) || 0;
     despesaPaga += Number(g.despesa_paga) || 0;
-    despesaPrevista += Number(g.despesa_prevista) || 0;
     despesaAPagar += Number(g.despesa_a_pagar) || 0;
-    despesaSemValor += Number(g.despesa_sem_valor) || 0;
   });
+  var desdeApp = rotuloMes(doApp[doApp.length - 1].competencia).toLowerCase();
 
   var cartaoSaldo = cartaoGrafico('Receitas × despesas × saldo');
+  cartaoSaldo.appendChild(notaGrafico('Meses do app, desde ' + desdeApp + '.'));
   cartaoSaldo.appendChild(linhaGrafico('Receitas recebidas', receitaRecebida));
   cartaoSaldo.appendChild(linhaGrafico('Despesas pagas', despesaPaga));
   cartaoSaldo.appendChild(linhaGrafico('Saldo', receitaRecebida - despesaPaga));
@@ -1406,28 +1493,19 @@ function desenharGraficos() {
 
   var maxPag = Math.max(despesaPaga, despesaAPagar);
   var cartaoPago = cartaoGrafico('Pago × a pagar');
+  cartaoPago.appendChild(notaGrafico('Meses do app, desde ' + desdeApp + '.'));
   cartaoPago.appendChild(barraGrafico('Pago', despesaPaga, maxPag, 'graf-pago'));
   cartaoPago.appendChild(barraGrafico('A pagar', despesaAPagar, maxPag, 'graf-apagar'));
   el.grafLista.appendChild(cartaoPago);
 
-  var meses = graficos.slice().reverse();
-  var maxDespesa = Math.max.apply(null, meses.map(function (g) {
-    return Number(g.despesa_prevista) || 0;
-  }).concat([1]));
-  var cartaoDespesa = cartaoGrafico('Despesas por mês');
-  meses.forEach(function (g) {
-    cartaoDespesa.appendChild(barraGrafico(
-      fmtMes.format(comoData(g.competencia)), g.despesa_prevista, maxDespesa, 'graf-pago'));
-  });
-  el.grafLista.appendChild(cartaoDespesa);
-
-  var maxAberto = Math.max.apply(null, meses.map(function (g) {
+  var mesesApp = doApp.slice().reverse();
+  var maxAberto = Math.max.apply(null, mesesApp.map(function (g) {
     return Number(g.despesa_a_pagar) || 0;
   }).concat([1]));
   var cartaoAberto = cartaoGrafico('Evolução do valor em aberto');
-  meses.forEach(function (g) {
+  mesesApp.forEach(function (g) {
     cartaoAberto.appendChild(barraGrafico(
-      fmtMes.format(comoData(g.competencia)), g.despesa_a_pagar, maxAberto, 'graf-apagar'));
+      mesCurto(g.competencia), g.despesa_a_pagar, maxAberto, 'graf-apagar'));
   });
   el.grafLista.appendChild(cartaoAberto);
 }

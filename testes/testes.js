@@ -814,8 +814,57 @@ var cartoes = q('#graf-lista').filhos.filter(function (f) {
   return f.className.indexOf('graf-cartao') === 0;
 });
 medir('quatro cartões de gráfico', cartoes.length, 4);
-medir('cartão de saldo mostra receitas', textoDe(cartoes[0]).indexOf('Receitas recebidas') >= 0, true);
-medir('cartão de pago mostra a pagar', textoDe(cartoes[1]).indexOf('A pagar') >= 0, true);
+medir('o primeiro é despesas por mês', cartoes[0].filhos[0]._txt, 'Despesas por mês');
+medir('cartão de saldo mostra receitas', textoDe(cartoes[1]).indexOf('Receitas recebidas') >= 0, true);
+medir('cartão de pago mostra a pagar', textoDe(cartoes[2]).indexOf('A pagar') >= 0, true);
+
+print('  -- despesas por mes: desde o arquivo antigo, riscada empilhada --');
+var barrasMes = cartoes[0].filhos.filter(function (f) {
+  return f.className.indexOf('graf-mes') >= 0;
+});
+function curto(c) {
+  var n = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  var p = c.split('-'); return n[+p[1] - 1] + '/' + p[0].slice(2);
+}
+medir('tres meses, o antigo incluido', barrasMes.length, 3);
+medir('do mais antigo ao mais recente', barrasMes.map(function (b) { return b.filhos[0]._txt; }),
+      [curto(MES_LEGADO), curto(MES_ANTERIOR), curto(MESHOJE)]);
+medir('legenda diz o que e cada cor', textoDe(cartoes[0]).indexOf('riscadas, fora do controle') >= 0, true);
+var pilhaAntiga = barrasMes[0].filhos[1].filhos;
+medir('mes antigo tem duas partes', pilhaAntiga.map(function (s) { return s.className; }),
+      ['graf-preenchida graf-acomp', 'graf-preenchida graf-risc']);
+print('  (a escala e o maior mes INTEIRO, riscada somada: 1800 + 400 = 2200)');
+medir('parte acompanhada na escala', pilhaAntiga[0].style.width, (1800 / 2200 * 100) + '%');
+medir('parte riscada na escala', pilhaAntiga[1].style.width, (400 / 2200 * 100) + '%');
+medir('valor do mes e o total, riscada somada', barrasMes[0].filhos[2]._txt, '2.200,00');
+print('  -- CONTROLE NEGATIVO: mes sem riscada nao ganha segunda parte --');
+medir('mes do app tem uma parte so', barrasMes[2].filhos[1].filhos.length, 1);
+medir('mes do app na mesma escala', barrasMes[2].filhos[1].filhos[0].style.width, (2025.30 / 2200 * 100) + '%');
+
+print('  -- tocar no mes mostra os numeros; tocar de novo esconde --');
+var detalheAntigo = barrasMes[0].filhos[3];
+medir('numeros escondidos de inicio', detalheAntigo.hidden, true);
+barrasMes[0].disparar('click');
+medir('tocou, apareceram', detalheAntigo.hidden, false);
+medir('as duas partes, por extenso', detalheAntigo._txt.indexOf(
+  'R$ 1.800,00 acompanhadas + R$ 400,00 riscadas · arquivo antigo') > 0, true);
+barrasMes[0].disparar('click');
+medir('tocou de novo, sumiram', detalheAntigo.hidden, true);
+
+print('  -- CONTROLE NEGATIVO: o resto e so dos meses do app --');
+print('  (o mes antigo tem 30 "a pagar" de isca; nao pode entrar)');
+var barraPago = cartoes[2].filhos.filter(function (f) { return f.className === 'graf-linha'; })[0];
+print('  (pago 229,90 contra a pagar 2795,40 = 8%; com o mes antigo vazando, 71%)');
+medir('pago x a pagar so do app', barraPago.filhos[1].filhos[0].style.width, '8%');
+var linhasSaldo = cartoes[1].filhos.filter(function (f) { return f.className === 'graf-linha-texto'; });
+medir('despesas pagas so do app', linhasSaldo[1]._txt, 'Despesas pagas R$ 229,90');
+medir('saldo so do app', linhasSaldo[2]._txt, 'Saldo R$ 5.620,10');
+var barrasAberto = cartoes[3].filhos.filter(function (f) { return f.className === 'graf-linha'; });
+medir('valor em aberto sem o mes antigo', barrasAberto.map(function (b) { return b.filhos[0]._txt; }),
+      [curto(MES_ANTERIOR), curto(MESHOJE)]);
+var barraAPagar = cartoes[2].filhos.filter(function (f) { return f.className === 'graf-linha'; })[1];
+medir('a pagar do app na escala (2795,40 contra 229,90)',
+      barraAPagar.filhos[1].filhos[0].style.width, '100%');
 q('#graf-voltar').disparar('click');
 esperar();
 medir('voltou para o mês', q('#tela-mes').hidden, false);

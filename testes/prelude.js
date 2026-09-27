@@ -197,17 +197,27 @@ var HISTORICO_LEGADO = [
     a_pagar: 0.00, contas: 1, sem_valor: 0, riscado: 50.00, riscadas: 1 }
 ];
 
+// Como a graficos() do bloco 18 devolve: do mais recente ao mais antigo, com
+// o mês do arquivo antigo no fim. O "a pagar" de 30 no mês antigo é isca: não
+// pode entrar em "Pago × a pagar", que é só dos meses do app. E o mês antigo
+// só é o maior se a riscada for somada (2200 contra 2025,30): é isso que
+// prova que a escala conta o mês inteiro.
 var GRAFICOS = [
-  { competencia: MES,
+  { competencia: MES, origem: 'app',
     despesa_prevista: 2025.30, despesa_paga: 129.90, despesa_a_pagar: 1895.40,
-    despesa_contas: 5, despesa_sem_valor: 2,
+    despesa_contas: 5, despesa_sem_valor: 2, despesa_riscada: 0, despesa_riscadas: 0,
     receita_total: 5120.50, receita_recebida: 5000.00,
     receita_a_receber: 120.50, receita_contas: 2, saldo: 4870.10 },
-  { competencia: MES_ANTERIOR,
+  { competencia: MES_ANTERIOR, origem: 'app',
     despesa_prevista: 1000.00, despesa_paga: 100.00, despesa_a_pagar: 900.00,
-    despesa_contas: 3, despesa_sem_valor: 1,
+    despesa_contas: 3, despesa_sem_valor: 1, despesa_riscada: 0, despesa_riscadas: 0,
     receita_total: 850.00, receita_recebida: 850.00,
-    receita_a_receber: 0.00, receita_contas: 1, saldo: 750.00 }
+    receita_a_receber: 0.00, receita_contas: 1, saldo: 750.00 },
+  { competencia: MES_LEGADO, origem: 'legado',
+    despesa_prevista: 1800.00, despesa_paga: 1770.00, despesa_a_pagar: 30.00,
+    despesa_contas: 2, despesa_sem_valor: 0, despesa_riscada: 400.00, despesa_riscadas: 1,
+    receita_total: 0, receita_recebida: 0, receita_a_receber: 0, receita_contas: 0,
+    saldo: null }
 ];
 
 function thenable(valor) {
