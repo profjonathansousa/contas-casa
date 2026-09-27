@@ -1,9 +1,8 @@
 # ESTADO — Nossas Contas
 
 Atualizado em 27/09/2026 — auditoria de retomada; bloco 16 (correções de
-dados) aplicado no banco; bloco 17 (o histórico numa tela só) com o SQL
-aplicado e provado, e o app numa branch esperando o merge. Próxima rodada:
-os gráficos.
+dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
+27/09/2026. Próxima rodada: os gráficos.
 
 ## ESTADO ATUAL
 
@@ -37,7 +36,8 @@ os gráficos.
   ficam à parte, nunca somadas em silêncio; os gráficos decidem se somam.
 - **Bloco 17 — o histórico numa tela só** (`sql/17_historico_completo.sql`,
   prova em `sql/17_prova_historico_completo.sql`). SQL aplicado e provado em
-  27/09/2026; o app está na branch e entra no ar no merge.
+  27/09/2026, antes do merge; app no ar no mesmo dia (`main` em `44d487e`,
+  Pages e bancada do CI verdes).
   - **A tela do mês não tem mais nada do legado**: nem seção, nem leitura, nem
     cache. Navegar com as setas até um mês antigo mostra o mês vazio, como
     qualquer mês sem conta.
@@ -77,8 +77,8 @@ os gráficos.
 
 ### O que está de pé
 
-- Blocos **1 a 16** concluídos, e o **Bloco 12** também. Bloco **17** com o
-  banco pronto e o app esperando o merge.
+- Blocos **1 a 16** concluídos, e o **Bloco 12** também. Bloco **17** no ar
+  desde 27/09/2026.
 - Bloco **11** (o mês corrente nasce sozinho ao abrir o app) **no ar**:
   `sql/11_geracao_automatica.sql` aplicado em 06/09/2026, provado em produção,
   e o app mesclado depois disso.
@@ -292,8 +292,8 @@ sobre agregações que depois mudam.
 
 Ordem decidida por Jonathan na auditoria de 27/09/2026:
 
-1. ~~**Rodada do histórico.**~~ **Feita no bloco 17**; falta Jonathan mesclar
-   a branch e conferir a tela de histórico no aparelho.
+1. ~~**Rodada do histórico.**~~ **Feita no bloco 17, no ar em 27/09**; falta
+   conferir a tela de histórico no aparelho.
 2. **Rodada dos gráficos**, sobre o histórico já correto: desde o início do
    controle.
 3. **"Parcelar" direto no lançamento** e **UX do código de pagamento**.
