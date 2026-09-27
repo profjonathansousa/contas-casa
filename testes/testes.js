@@ -996,22 +996,42 @@ medir('apagou na tabela certa', LOG.deletes[antesDelRec].tabela, 'receita');
 medir('id certo', LOG.deletes[antesDelRec].id, 'r2');
 medir('sumiu da lista de receitas', receitasDesenhadas().length, 1);
 
+// Envia como o navegador: campo obrigatorio vazio barra o envio, e o
+// "submit" nem chega ao app. Devolve se o envio aconteceu.
+function enviarComoNavegador(form, campos) {
+  var barrado = campos.some(function (c) { return q(c).required && !String(q(c).value || '').trim(); });
+  if (!barrado) q(form).disparar('submit');
+  return !barrado;
+}
+
 print('\n  -- criar receita --');
 var antesInsRec = LOG.inserts.length;
 q('#btn-add-receita').disparar('click');
 medir('folha de receita abriu', q('#folha-add').hidden, false);
 medir('título da folha', q('#ad-titulo')._txt, 'Nova receita');
 medir('campo de dia escondido', q('#campo-dia').hidden, true);
+print('  (e, escondido, NAO pode continuar obrigatorio: o navegador barraria o');
+print('   envio sem aviso nenhum, que foi o defeito de 27/09 no aparelho)');
+medir('dia deixa de ser obrigatorio', !!q('#ad-dia').required, false);
 medir('rótulo do valor', q('#rotulo-ad-valor')._txt, 'Valor');
 q('#ad-desc').value = 'Freela';
 q('#ad-valor').value = '300,00';
-q('#folha-add').disparar('submit');
+medir('o navegador deixa enviar', enviarComoNavegador('#folha-add', ['#ad-desc', '#ad-dia', '#ad-valor']), true);
 esperar();
 medir('insert de receita feito', LOG.inserts.length - antesInsRec, 1);
 medir('campos do insert', Object.keys(LOG.inserts[antesInsRec]).sort(),
       ['casa_id','competencia','descricao','valor']);
 medir('competência da receita', LOG.inserts[antesInsRec].competencia, MESHOJE);
 medir('entrou na lista', receitasDesenhadas().length, 2);
+
+print('  -- CONTROLE NEGATIVO: na conta do mes, o dia continua obrigatorio --');
+q('#btn-add').disparar('click');
+medir('conta tem campo de dia', q('#campo-dia').hidden, false);
+medir('e ele e obrigatorio', q('#ad-dia').required, true);
+q('#ad-desc').value = 'Sem dia';
+q('#ad-dia').value = '';
+medir('sem dia o navegador barra', enviarComoNavegador('#folha-add', ['#ad-desc', '#ad-dia', '#ad-valor']), false);
+q('#ad-cancelar').disparar('click');
 
 print('\n  -- Realtime: evento de receita da competência atual --');
 var nRecAntesEvento = receitasDesenhadas().length;

@@ -52,6 +52,12 @@ Elem.prototype.appendChild = function (c) { c.pai = this; return _ap.call(this, 
   var n = 0;
   while ((m = re.exec(html))) { document.querySelector('#' + m[1]).hidden = true; n++; }
   if (n < 5) throw new Error('bancada nao leu o index.html: so ' + n + ' elementos escondidos');
+  // O mesmo para "required": o navegador se recusa a enviar formulario com
+  // campo obrigatorio vazio -- mesmo escondido, e ai sem mostrar aviso nenhum.
+  // Foi assim que "+ receita" ficou mudo no aparelho e verde aqui.
+  var rq = /id="([^"]+)"[^>]*\srequired/g, r, k = 0;
+  while ((r = rq.exec(html))) { document.querySelector('#' + r[1]).required = true; k++; }
+  if (k < 3) throw new Error('bancada nao leu os campos obrigatorios: so ' + k);
 })();
 
 var window = { addEventListener: function () {}, CONFIG: { URL: 'http://x', ANON: 'k' } };

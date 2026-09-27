@@ -1948,6 +1948,10 @@ function abrirFolha(modo) {
   el.adDia.value = '';
   el.adValor.value = '';
   el.campoDia.hidden = modoFolha === 'receita';
+  // Escondido tem que deixar de ser obrigatório: o navegador recusa enviar
+  // formulário com campo obrigatório vazio, e sem aviso quando o campo está
+  // escondido. Era por isso que "+ receita" não fazia nada no aparelho.
+  el.adDia.required = modoFolha !== 'receita';
   el.rotuloAdValor.textContent = modoFolha === 'receita'
     ? 'Valor' : 'Valor (pode deixar vazio)';
   el.erroAdd.hidden = true;

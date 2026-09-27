@@ -63,7 +63,7 @@ está completa.
     tabela, lista em ordem, e o controle negativo (sem perfil) vê 0 meses.
   - Achado para a rodada dos gráficos: três meses antigos têm "a pagar"
     diferente de zero — itens sem marca de pago nem de riscado no arquivo.
-  - Bancada: **332 / 4 / 27 / 49**, 0 falhas. O controle negativo foi feito
+  - Bancada: **337 / 4 / 27 / 49**, 0 falhas. O controle negativo foi feito
     numa cópia: com a seção e a leitura do legado de volta na tela do mês,
     três medidas ficam vermelhas. O `localStorage` falso da bancada ganhou
     `length` e `key()`, como o do navegador: sem isso o logout era medido
@@ -94,7 +94,7 @@ está completa.
   - Provado no banco: 23 meses, 10 com riscada (9% do gasto do período), a
     mesma conta da tela de histórico mês a mês, nenhum saldo em mês antigo,
     nenhuma receita caindo em mês antigo, e o controle negativo vê 0 meses.
-  - Bancada **332 / 4 / 27 / 49**, 0 falhas. Controle negativo numa cópia:
+  - Bancada **337 / 4 / 27 / 49**, 0 falhas. Controle negativo numa cópia:
     com o mês antigo vazando para os cartões do app e a escala ignorando a
     riscada, sete medidas ficam vermelhas.
   - **Janela entre o SQL e o merge:** por cerca de 20 minutos a `graficos()`
@@ -131,11 +131,30 @@ está completa.
     parcelar de novo não duplica a fixa; fixa desligada de mesma descrição é
     religada; PIX estático copiado e dinâmico não; os quatro controles
     negativos e o de duas contas na mesma fixa recusados. Nada ficou gravado.
-  - Bancada **332 / 4 / 27 / 49**, 0 falhas. Controle negativo em quatro
+  - Bancada **337 / 4 / 27 / 49**, 0 falhas. Controle negativo em quatro
     mutações separadas (a quarta: chip de volta em conta vinda de fixa) (chip sem barrar o "segurar", checagem da janela
     removida, folha da fixa herdando o título do parcelar): todas vermelhas.
     O DOM da bancada não propaga eventos; a medida do "segurar" simula a
     propagação, senão não enxergaria o defeito.
+- **Conserto de 27/09: "+ receita" não fazia nada no aparelho.** Relatado
+  por Jonathan na primeira tentativa real. A folha de "+" serve a conta, fixa
+  e receita; na receita o campo "vence dia" fica escondido, mas continuava
+  `required` no HTML. O navegador recusa enviar formulário com campo
+  obrigatório vazio e, com o campo escondido, não mostra aviso nenhum: o
+  toque em "Adicionar" morria em silêncio. Reproduzido no Chromium antes do
+  conserto (formulário inválido, nenhum insert, folha aberta).
+  - Conserto: o dia deixa de ser obrigatório quando está escondido, e volta a
+    ser na conta e na fixa.
+  - **Por que a bancada não pegou:** ela disparava o `submit` direto, sem a
+    validação do navegador — e ainda media "campo de dia escondido" como
+    acerto, que era exatamente a condição do defeito. Agora ela lê do
+    `index.html` real quais campos são `required` (como já lia os `hidden`)
+    e o teste da receita envia como o navegador envia. Sem o conserto, três
+    medidas ficam vermelhas; com ele, **337 / 4 / 27 / 49**.
+  - Nenhum outro campo obrigatório do app é escondido (login e troca de
+    senha conferidos).
+  - O bloco 14 nunca tinha sido validado num aparelho; esta foi a primeira
+    receita real, e o motivo de a validação manual existir.
 - **Bloco 20 — UX do código de pagamento**, como desenhado na auditoria.
   Só tela; o banco não muda. No ar em 27/09/2026.
   - O chip diz o que copia: **"copiar código PIX"**, **"copiar código do
@@ -148,7 +167,7 @@ está completa.
   - Nenhum dos dois marca pago nem abre o "apagar conta": o toque e o
     segurar param no botão. As ações ficam lado a lado e quebram de linha
     alinhadas à esquerda; cada rótulo fica inteiro, mesmo em 320 px.
-  - Bancada **332 / 4 / 27 / 49**, 0 falhas; os rótulos de PIX e de conta
+  - Bancada **337 / 4 / 27 / 49**, 0 falhas; os rótulos de PIX e de conta
     de consumo são medidos chegando pelo Realtime, como se o outro aparelho
     tivesse colado. Controle negativo em quatro mutações separadas (rótulo
     genérico, "alterar" deixando o segurar passar, "remover" deixando o
@@ -180,7 +199,7 @@ está completa.
   aprovado e o histórico real importado em tabelas próprias.
 - Bloco **12** (gráficos) **implementado e provado no banco**:
   `sql/12_graficos.sql` aplicado e `sql/12_prova_graficos.sql` aprovado.
-- Bancada verde em **332 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bancada verde em **337 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.
@@ -229,7 +248,8 @@ A terceira coluna é a que quase sempre falta.
 ### Validações manuais ainda pendentes
 
 1. **Primeiro código de pagamento colado** e conferido num aparelho.
-2. **Lançar a primeira receita real** — Jonathan lança na virada do mês.
+2. **Lançar a primeira receita real** — a primeira tentativa, em 27/09,
+   achou o defeito do "+ receita"; tentar de novo depois do conserto.
 3. **Outubro nascer sozinho em 01/10**: abrir o app no dia 1º e conferir que
    as contas fixas vieram sem tocar no botão.
 4. **Conferir a tela de histórico** num aparelho, depois da rodada do
