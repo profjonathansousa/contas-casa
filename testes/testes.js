@@ -975,7 +975,10 @@ function voltaMeses(c, n) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
 }
 medir('conta sem parcela oferece parcelar', chipParcelarDe(itemPorDesc('Luz'))._txt, 'parcelar');
-medir('conta que ja e parcela nao oferece', chipParcelarDe(itemPorDesc('Cartao azul')), undefined);
+medir('conta que ja e parcela nao oferece', !!chipParcelarDe(itemPorDesc('Cartao azul')), false);
+print('  (so em conta digitada a mao: a que veio de uma fixa se parcela em contas fixas)');
+medir('conta que veio de fixa nao oferece', !!chipParcelarDe(itemPorDesc('Aluguel')), false);
+medir('o app pede de onde a conta veio', LOG.colunas.lancamento.split(',').indexOf('modelo_id') >= 0, true);
 medir('o chip de codigo continua o primeiro', partesDo(itemPorDesc('Luz'), 'codigo')[0]._txt, '+ código');
 
 print('  (tocar no chip NAO marca pago; segurar NAO apaga)');
@@ -1052,7 +1055,7 @@ medir('com a conta, o total e a primeira', LOG.rpcs[rpcSalvar].args,
 medir('nenhum update direto', LOG.updates.length - upParc, 0);
 medir('folha fechou', q('#folha-parcelas').hidden, true);
 medir('a linha mostra 3/10', partesDo(itemPorDesc('Luz'), 'parcela')[0]._txt, '3/10');
-medir('e o chip sumiu', chipParcelarDe(itemPorDesc('Luz')), undefined);
+medir('e o chip sumiu', !!chipParcelarDe(itemPorDesc('Luz')), false);
 medir('releu as fixas', LOG.selects.slice(selSalvar).some(function (s) { return s.tabela === 'modelo'; }), true);
 medir('diz o que aconteceu', q('#aviso')._txt, 'Virou conta fixa, 3/10. As próximas vêm sozinhas.');
 

@@ -3,7 +3,7 @@
 Atualizado em 27/09/2026 — auditoria de retomada; bloco 16 (correções de
 dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
 27/09/2026; bloco 18 (os gráficos desde o início) no ar desde 27/09/2026; bloco 19
-("parcelar" direto na conta do mês) com o SQL aplicado e o app na branch.
+("parcelar" direto na conta do mês) no ar desde 27/09/2026.
 
 ## ESTADO ATUAL
 
@@ -61,7 +61,7 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
     tabela, lista em ordem, e o controle negativo (sem perfil) vê 0 meses.
   - Achado para a rodada dos gráficos: três meses antigos têm "a pagar"
     diferente de zero — itens sem marca de pago nem de riscado no arquivo.
-  - Bancada: **313 / 4 / 27 / 49**, 0 falhas. O controle negativo foi feito
+  - Bancada: **315 / 4 / 27 / 49**, 0 falhas. O controle negativo foi feito
     numa cópia: com a seção e a leitura do legado de volta na tela do mês,
     três medidas ficam vermelhas. O `localStorage` falso da bancada ganhou
     `length` e `key()`, como o do navegador: sem isso o logout era medido
@@ -92,7 +92,7 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
   - Provado no banco: 23 meses, 10 com riscada (9% do gasto do período), a
     mesma conta da tela de histórico mês a mês, nenhum saldo em mês antigo,
     nenhuma receita caindo em mês antigo, e o controle negativo vê 0 meses.
-  - Bancada **313 / 4 / 27 / 49**, 0 falhas. Controle negativo numa cópia:
+  - Bancada **315 / 4 / 27 / 49**, 0 falhas. Controle negativo numa cópia:
     com o mês antigo vazando para os cartões do app e a escala ignorando a
     riscada, sete medidas ficam vermelhas.
   - **Janela entre o SQL e o merge:** por cerca de 20 minutos a `graficos()`
@@ -101,7 +101,7 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
     leitura, nada gravado; fechada com o merge.
 - **Bloco 19 — "parcelar" direto na conta do mês**
   (`sql/19_parcelar_lancamento.sql`, prova em `sql/19_prova_parcelar.sql`).
-  SQL aplicado e provado em 27/09/2026; o app está na branch.
+  SQL aplicado e provado em 27/09/2026; app no ar no mesmo dia.
   - Segue o desenho registrado na auditoria: nada de entidade nova. Parcelar
     é ligar a conta do mês a uma conta fixa com janela de parcelas — a que já
     está ligada, senão a de mesma descrição (a comparação do `gerar_mes()`),
@@ -115,8 +115,12 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
   - PIX estático vai para a fixa; boleto, conta de consumo e PIX dinâmico
     ficam só no mês. A regra do dinâmico é a mesma do `lerPix()`: campo 01
     igual a 12, logo depois do `000201`.
-  - Na tela: chip **"parcelar"** ao lado do "+ código", só em conta que ainda
-    não diz que parcela é. Abre a mesma folha das contas fixas, com título e
+  - Na tela: chip **"parcelar"** ao lado do "+ código", só em conta
+    **digitada à mão** que ainda não diz que parcela é. Decisão de Jonathan
+    na revisão: com todas as contas do mês vindas de fixas, o chip em toda
+    linha deixaria a tela mais carregada que a nota; a que veio de fixa se
+    parcela em contas fixas, como antes. Para isso o app passou a ler
+    `modelo_id` da conta. Abre a mesma folha das contas fixas, com título e
     explicação próprios, o mês da primeira já preenchido com o mês da conta,
     e uma leitura ao vivo: *"Esta conta vira a parcela 3 de 10; a última cai
     em 04/2027."* Fora da janela, a leitura avisa e o app nem chama o banco.
@@ -125,8 +129,8 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
     parcelar de novo não duplica a fixa; fixa desligada de mesma descrição é
     religada; PIX estático copiado e dinâmico não; os quatro controles
     negativos e o de duas contas na mesma fixa recusados. Nada ficou gravado.
-  - Bancada **313 / 4 / 27 / 49**, 0 falhas. Controle negativo em três
-    mutações separadas (chip sem barrar o "segurar", checagem da janela
+  - Bancada **315 / 4 / 27 / 49**, 0 falhas. Controle negativo em quatro
+    mutações separadas (a quarta: chip de volta em conta vinda de fixa) (chip sem barrar o "segurar", checagem da janela
     removida, folha da fixa herdando o título do parcelar): todas vermelhas.
     O DOM da bancada não propaga eventos; a medida do "segurar" simula a
     propagação, senão não enxergaria o defeito.
@@ -157,7 +161,7 @@ dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
   aprovado e o histórico real importado em tabelas próprias.
 - Bloco **12** (gráficos) **implementado e provado no banco**:
   `sql/12_graficos.sql` aplicado e `sql/12_prova_graficos.sql` aprovado.
-- Bancada verde em **313 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bancada verde em **315 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.
@@ -360,8 +364,9 @@ Ordem decidida por Jonathan na auditoria de 27/09/2026:
    conferir a tela de histórico no aparelho.
 2. ~~**Rodada dos gráficos**~~ **Feita no bloco 18, no ar em 27/09**; falta
    conferir no aparelho.
-3. ~~**"Parcelar" direto no lançamento**~~ **feito no bloco 19**, falta o
-   merge e conferir no aparelho; **UX do código de pagamento** é a próxima.
+3. ~~**"Parcelar" direto no lançamento**~~ **feito no bloco 19, no ar em
+   27/09**, falta conferir no aparelho; **UX do código de pagamento** é a
+   próxima.
 4. **01/10: abrir o app** e conferir que outubro nasceu sozinho.
 5. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
    ou no mecanismo de `postgres_changes`.

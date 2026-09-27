@@ -138,6 +138,8 @@ var BANCO = [
   lanc('l4', 'Internet', 10, 129.90, true),
   lanc('l5', 'Cartao azul', 15, null, false)
 ];
+// O Aluguel veio de uma conta fixa; os outros foram digitados à mão.
+BANCO[0].modelo_id = 'm1';
 
 function receita(id, desc, valor, recebido) {
   return { id: id, competencia: MES, descricao: desc, valor: valor,
@@ -299,6 +301,7 @@ var supabase = {
       from: function (tabela) {
         return {
           select: function (cols) {
+            (LOG.colunas = LOG.colunas || {})[tabela] = cols;
             var t = thenable(function () {
               if (tabela === 'perfil') {
                 return { data: PERFIS.map(function (x) {

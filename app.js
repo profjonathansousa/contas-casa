@@ -49,7 +49,7 @@ var el = {
   snCancelar: $('#sn-cancelar'), erroSenha: $('#erro-senha')
 };
 
-var COLUNAS = 'id,competencia,descricao,dia_vencimento,vencimento,' +
+var COLUNAS = 'id,modelo_id,competencia,descricao,dia_vencimento,vencimento,' +
               'valor_previsto,valor_pago,pago,pago_em,pago_por,' +
               'parcela_n,parcela_de,codigo_pagamento,codigo_tipo';
 
@@ -937,7 +937,7 @@ function linha(it) {
   valor.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
 
   corpo.appendChild(chipCodigo(it));
-  if (it.parcela_n == null) corpo.appendChild(chipParcelar(it));
+  if (it.parcela_n == null && it.modelo_id == null) corpo.appendChild(chipParcelar(it));
 
   ligarToques(div, function () { alternarPago(it); }, function () { pedirApagar(it, 'lancamento'); });
 
@@ -966,8 +966,10 @@ function chipCodigo(it) {
 }
 
 // Parcelar sai da própria linha: a conta digitada à mão vira fixa com janela
-// de parcelas, sem passar pela tela de contas fixas. Só aparece em conta que
-// ainda não diz que parcela é; a que já diz se ajusta em contas fixas.
+// de parcelas, sem passar pela tela de contas fixas. Só aparece em conta
+// digitada à mão e que ainda não diz que parcela é: a que veio de uma fixa se
+// parcela em contas fixas, e pôr o chip em todas as linhas deixaria a tela do
+// mês mais carregada que a nota que ela substitui.
 function chipParcelar(it) {
   var b = document.createElement('button');
   b.type = 'button';
@@ -1711,6 +1713,7 @@ async function salvarParcelar(it) {
   var feito = (r.data && r.data[0]) || { parcela_n: leitura.n, parcela_de: total };
   it.parcela_n = feito.parcela_n;
   it.parcela_de = feito.parcela_de;
+  if (feito.modelo_id) it.modelo_id = feito.modelo_id;
   fecharParcelas();
   await carregarModelos();       // a fixa nova conta para o "Trazer N contas fixas"
   desenhar();
