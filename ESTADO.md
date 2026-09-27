@@ -2,8 +2,7 @@
 
 Atualizado em 27/09/2026 — auditoria de retomada; bloco 16 (correções de
 dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
-27/09/2026; bloco 18 (os gráficos desde o início) com o SQL aplicado e o app
-na branch.
+27/09/2026; bloco 18 (os gráficos desde o início) no ar desde 27/09/2026.
 
 ## ESTADO ATUAL
 
@@ -68,7 +67,8 @@ na branch.
     pelo caminho que nenhum aparelho usa.
 - **Bloco 18 — os gráficos desde o início do controle**
   (`sql/18_graficos_desde_o_inicio.sql`, prova em `sql/18_prova_graficos.sql`,
-  que substitui a do bloco 12). SQL aplicado e provado em 27/09/2026.
+  que substitui a do bloco 12). SQL aplicado e provado em 27/09/2026; app no
+  ar no mesmo dia (`main` em `16b7cd4`).
   - `graficos()` lê as despesas de `historico_completo()`: mesma regra de
     corte e mesma conta por mês da tela de histórico. Ganha `origem`,
     `despesa_riscada` e `despesa_riscadas`; `saldo` fica **nulo** em mês do
@@ -94,10 +94,10 @@ na branch.
   - Bancada **280 / 4 / 27 / 49**, 0 falhas. Controle negativo numa cópia:
     com o mês antigo vazando para os cartões do app e a escala ignorando a
     riscada, sete medidas ficam vermelhas.
-  - **Janela entre o SQL e o merge:** a `graficos()` nova já está no banco,
-    e o app publicado ainda é o do bloco 17, que soma todas as linhas. Até o
-    merge, a tela de gráficos em produção mistura o arquivo antigo nos
-    totais. Nada quebra (a tela só lê), mas os números ficam errados ali.
+  - **Janela entre o SQL e o merge:** por cerca de 20 minutos a `graficos()`
+    nova esteve no banco com o app do bloco 17 no ar, que soma todas as
+    linhas: a tela de gráficos misturou o arquivo antigo nos totais. Só
+    leitura, nada gravado; fechada com o merge.
 - **Rodapé que empurrava a página para o lado**, achado na captura do bloco
   17 e corrigido no mesmo dia: desde o bloco 12 eram cinco links numa linha
   só, mais largos que um iPhone. Agora quebram em duas linhas, cada link
@@ -327,7 +327,7 @@ Ordem decidida por Jonathan na auditoria de 27/09/2026:
 
 1. ~~**Rodada do histórico.**~~ **Feita no bloco 17, no ar em 27/09**; falta
    conferir a tela de histórico no aparelho.
-2. ~~**Rodada dos gráficos**~~ **Feita no bloco 18**; falta o merge e
+2. ~~**Rodada dos gráficos**~~ **Feita no bloco 18, no ar em 27/09**; falta
    conferir no aparelho.
 3. **"Parcelar" direto no lançamento** e **UX do código de pagamento**.
 4. **01/10: abrir o app** e conferir que outubro nasceu sozinho.
