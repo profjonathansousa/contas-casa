@@ -1,14 +1,45 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 07/09/2026 — blocos 11 e 13 em produção; blocos 14, 15 e 12
-implementados, aplicados e provados no banco. Blocos 1 a 15 e Bloco 12
-concluídos.
+Atualizado em 27/09/2026 — auditoria de retomada e bloco 16 (correções de
+dados) aplicado no banco. Próxima rodada: o histórico numa tela só.
 
 ## ESTADO ATUAL
 
+### Auditoria de 27/09/2026 — o que mudou de entendimento
+
+- **O histórico legado está no lugar errado.** O bloco 15 o pôs como seção da
+  tela do mês, abaixo das receitas. Não era o pedido: o histórico antigo
+  (novembro/2024 a agosto/2026) foi importado para morar na **tela de
+  histórico**, junto com os meses do app, e servir de base para os gráficos
+  desde o início do controle. Hoje nem a `historico()` nem a `graficos()`
+  enxergam o legado. É a próxima rodada; os gráficos vêm depois dela.
+- **O banco é compartilhado com o Cronograma.** O projeto Supabase
+  (`sa-east-1`) hospeda também o portal de aulas, do repositório
+  `profjonathansousa.github.io`. As tabelas `cron_*` são dele — inclusive
+  `cron_push_inscricao`, que a fase 0 tinha dado como órfã. Ela está viva (um
+  aparelho inscrito, política de INSERT para `anon`) e **fica**. Qualquer
+  limpeza no `public` precisa olhar os dois repositórios.
+- **Bloco 16 — correções de dados, aplicado em 27/09/2026**
+  (`sql/16_correcoes_de_dados.sql`, prova em `sql/16_prova_correcoes.sql`):
+  1. o bloco "outubro/26" do arquivo antigo era **outubro/2025** — confirmado
+     por Jonathan; as 22 linhas mudaram de mês, e a sequência do arquivo
+     ficou sem buraco;
+  2. a marca de backfill de **outubro/2026** saiu: as 14 contas que a
+     justificavam foram apagadas depois de 06/09, e com a marca o mês abriria
+     vazio em 01/10. Agora `garantir_mes()` cria outubro sozinho no dia 1º —
+     **é o primeiro teste real do bloco 11**, que antes ficaria para 01/11.
+- **Contas riscadas no legado** (50, de novembro/2025 a agosto/2026, até 41%
+  do valor de um mês): riscar queria dizer "saiu do meu controle" — eram
+  contas pagas pela esposa, que Jonathan deixou de acompanhar. Não são
+  despesa que não existiu. Tratamento na próxima rodada.
+- **Validado por Jonathan:** a segunda pessoa da casa entra no app e os
+  avisos chegam para os dois.
+- **Em pausa, por decisão:** proteção de senha vazada no Supabase.
+  **Fora:** gráficos por categoria.
+
 ### O que está de pé
 
-- Blocos **1 a 15** concluídos, e o **Bloco 12** também.
+- Blocos **1 a 16** concluídos, e o **Bloco 12** também.
 - Bloco **11** (o mês corrente nasce sozinho ao abrir o app) **no ar**:
   `sql/11_geracao_automatica.sql` aplicado em 06/09/2026, provado em produção,
   e o app mesclado depois disso.
@@ -57,29 +88,27 @@ A terceira coluna é a que quase sempre falta.
 | **Web Push: enviar de verdade** | sim | só o texto do aviso (11 medidas) | **sim — chegou no iPhone; último envio 03/09/2026** |
 | **cron diário do aviso** | sim | não | sim, roda todo dia — mas **atrasava de 3h35 a 4h15** |
 | **slots de aviso por hora de Brasília** | sim (bloco 6) | sim | sim — na `main` desde 05/09, com `sql/07` no banco |
-| **três avisos, um por pessoa** | sim (bloco 7) | sim | parcialmente: **os interruptores apareceram no iPhone** (05/09); os avisos em si ainda não chegaram |
+| **três avisos, um por pessoa** | sim (bloco 7) | sim | **sim — os avisos chegam para os dois (confirmado por Jonathan em 27/09)** |
 | **contas que acabam (parcelas)** | sim (bloco 9) | sim | **sim — confirmado por Jonathan em 05/09; 3 contas fixas já parceladas no banco** |
 | **código de barras / PIX colado** | sim (bloco 8) | sim (140/4/24/49) | **não — no ar, mas nenhum código colado ainda** |
-| **o mês corrente nasce sozinho** | sim (bloco 11) | sim (bancada 170/4/27/49 com dois controles negativos + réplica local, inclusive concorrência com duas sessões) | **parcialmente — `sql/11` aplicado e provado em produção em 06/09; falta um aparelho de verdade abrir o app num mês novo** |
+| **o mês corrente nasce sozinho** | sim (bloco 11) | sim (bancada 170/4/27/49 com dois controles negativos + réplica local, inclusive concorrência com duas sessões) | **parcialmente — `sql/11` aplicado e provado em produção em 06/09; o primeiro mês novo de verdade é 01/10 (a marca de outubro saiu no bloco 16)** |
 | **histórico derivado** | sim (bloco 13) | sim (bancada + prova SQL) | **sim — aplicado, provado no banco e publicado no Pages** |
 | **receitas** | sim (bloco 14) | sim (bancada + prova SQL do 14) | **não — aplicado e provado no banco; nenhuma receita real lançada ainda** |
-| **histórico legado** | sim (bloco 15) | sim (bancada + prova SQL do 15) | **sim — aplicado, provado e importado no banco; UI integrada** |
+| **histórico legado** | sim (bloco 15) | sim (bancada + prova SQL do 15) | **dados sim (outubro/2025 corrigido no bloco 16); tela não — está na tela do mês, e o lugar certo é a tela de histórico** |
 | **gráficos** | sim (bloco 12) | sim (bancada + prova SQL do 12) | **não — aplicado e provado no banco; ainda não validado no aparelho** |
 | **trocar e recuperar a senha** | sim (bloco 10) | sim (os controles estão no placar atual) | **não — ainda não exercitado num aparelho depois do bloco 10** |
-| segundo morador (a esposa) | — | — | **não: nunca entrou** |
+| segundo morador (a esposa) | — | — | **sim — entra no app e recebe os avisos (confirmado por Jonathan em 27/09)** |
 
 ### Validações manuais ainda pendentes
 
 1. **Primeiro código de pagamento colado** e conferido num aparelho.
-2. **Login da segunda pessoa da casa** e inscrição do aparelho dela nos avisos.
-3. **Aviso de véspera / por pessoa** chegando de verdade num aparelho, além do
-   aviso único já validado.
-4. **Lançar a primeira receita real** num aparelho e conferir que ela aparece
-   separada das despesas.
-5. **Conferir a visualização do histórico legado** num aparelho, depois do push
-   desta implementação.
-6. **Conferir a tela de gráficos** num aparelho, depois do push desta
-   implementação.
+2. **Lançar a primeira receita real** — Jonathan lança na virada do mês.
+3. **Outubro nascer sozinho em 01/10**: abrir o app no dia 1º e conferir que
+   as contas fixas vieram sem tocar no botão.
+4. **Conferir a tela de histórico** num aparelho, depois da rodada do
+   histórico.
+5. **Conferir a tela de gráficos** num aparelho, depois da rodada dos
+   gráficos.
 
 O **Realtime entre dois aparelhos** já está validado manualmente; não é uma
 pendência, mas deve ser revalidado em qualquer mudança futura que toque no
@@ -153,7 +182,8 @@ porquê de cada resposta. Em resumo:
 - Na tela, o histórico legado aparece numa seção própria do mês, abaixo das
   receitas, sem alterar totais correntes.
 - `outubro/26` foi preservado na ordem original do arquivo; a posição incomum
-  não foi reinterpretada.
+  não foi reinterpretada. *Em 27/09/2026 Jonathan confirmou que era
+  outubro/2025; corrigido no bloco 16.*
 
 **Bloco 12 — gráficos — IMPLEMENTADO**
 
@@ -220,19 +250,20 @@ sobre agregações que depois mudam.
 
 ## PRÓXIMO PASSO
 
-1. **Abrir o app num aparelho** e confirmar que a tela do mês aparece normal.
-   Em 06/09 o mês corrente já estava marcado pelo backfill, então a primeira
-   geração automática de verdade só acontece em **01/10**: é nela que o bloco 11
-   se prova sozinho.
-2. **Colar o primeiro código de pagamento** e conferir que o valor vem
-   sozinho — pendência do bloco 8.
-3. **A segunda pessoa da casa entra no app** e liga os avisos no aparelho
-   dela — pré-requisito humano dos avisos por pessoa.
-4. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
+Ordem decidida por Jonathan na auditoria de 27/09/2026:
+
+1. **Rodada do histórico.** Tirar o legado da tela do mês; a tela de
+   histórico lista todos os meses, de novembro/2024 em diante — o legado até
+   agosto/2026, o app de setembro/2026 em diante (setembro está nos dois e
+   vale o do app). Mês antigo abre o detalhe dentro do histórico. O total de
+   cada mês antigo é calculado no banco, para os gráficos reaproveitarem. As
+   contas riscadas aparecem separadas, nunca somadas em silêncio.
+2. **Rodada dos gráficos**, sobre o histórico já correto: desde o início do
+   controle.
+3. **"Parcelar" direto no lançamento** e **UX do código de pagamento**.
+4. **01/10: abrir o app** e conferir que outubro nasceu sozinho.
+5. **Manter a validação manual de Realtime** a cada mudança que tocar na tela
    ou no mecanismo de `postgres_changes`.
-5. **Auditar o Bloco 12** depois do push.
-6. Depois das pendências humanas e da auditoria do Bloco 12, seguir para as
-   validações manuais restantes, sem reabrir os blocos 11, 13, 14 ou 15.
 
 ## HISTÓRICO TÉCNICO
 
@@ -649,6 +680,14 @@ não há razão para ela existir. `pg_cron` e `pg_net` não estão instalados e 
 há Edge Function nenhuma: não existe um segundo caminho de envio rodando por
 trás. Decidir se apaga ou se documenta é do Jonathan; a fase 0 não mexeu em
 produção.
+
+*Corrigido em 27/09/2026:* a tabela não é órfã. O mesmo projeto Supabase
+hospeda o **Cronograma** (repositório `profjonathansousa.github.io`), e
+`cron_push_inscricao` é a tabela de inscrições de aviso dele — criada em
+`sql/cron_push.sql` daquele repositório e usada pelo portal e pelo robô
+dele. Em 27/09 tinha um aparelho inscrito e a política `cron_push_inscrever`
+(INSERT para `anon`). O `cron_` é de Cronograma, não de `pg_cron`. **Fica.**
+O erro nasceu de olhar um repositório só; a regra agora é olhar os dois.
 
 Contagem do banco em 02/09/2026: casa 1, perfil 2, lancamento 35, modelo 21,
 push_inscricao **1** — ou seja, já há um aparelho inscrito, ao contrário do que
@@ -1354,7 +1393,8 @@ ou do painel do Supabase.
 6. **Login da esposa**, e a inscrição do aparelho dela nos avisos.
 7. **Ligar a proteção de senha vazada** no Supabase (Authentication > Policies),
    apontada pelo linter: hoje está desligada, e é um clique.
-8. **Decidir o destino de `public.cron_push_inscricao`.**
+8. ~~Decidir o destino de `public.cron_push_inscricao`.~~ **Decidido em
+   27/09: fica — é do Cronograma, que divide o banco com este app.**
 
 ## O primeiro run do robô novo, medido (05/09/2026)
 
@@ -1635,3 +1675,7 @@ devolve zero — corretamente. É em **01/10**, quando alguém abrir o app, que 
 bloco se prova sozinho: `mes_gerado` deve ganhar uma linha `2026-10-01`... que
 já existe, também pelo backfill. Então o teste de verdade é **01/11**. Até lá,
 o que está provado é o mecanismo, não o ciclo completo.
+
+*Atualizado em 27/09/2026:* as 14 contas de outubro foram apagadas depois do
+backfill, e a marca ficou sem conta nenhuma. O bloco 16 tirou a marca; o
+teste de verdade volta a ser **01/10**.

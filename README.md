@@ -13,7 +13,7 @@ carro sem apertar os olhos, funcionar com o polegar de uma mão só.
 |---|---|
 | Interface | HTML + CSS + JavaScript puro. Sem framework, sem build, sem npm. |
 | Robô do aviso diário | Node no GitHub Actions, com `npm ci` e `package-lock.json` (só em `avisos/`, nunca no frontend) |
-| Banco, sync e login | Supabase (Postgres + Realtime + Auth), free tier |
+| Banco, sync e login | Supabase (Postgres + Realtime + Auth), free tier — **projeto dividido com o Cronograma** (`profjonathansousa.github.io`): as tabelas `cron_*` são dele |
 | Hospedagem | GitHub Pages, repositório público `contas-casa` |
 
 ## Estrutura
@@ -44,7 +44,9 @@ CONTAS_CASA/
 │   ├── 15_historico_legado.sql  histórico legado: tabelas, RLS e importador
 │   ├── 15_prova_historico_legado.sql  prova do bloco 15
 │   ├── 12_graficos.sql          RPC de gráficos sobre despesas e receitas
-│   └── 12_prova_graficos.sql    prova do bloco 12
+│   ├── 12_prova_graficos.sql    prova do bloco 12
+│   ├── 16_correcoes_de_dados.sql  outubro/2025 no legado; marca de outubro/2026
+│   └── 16_prova_correcoes.sql     prova do bloco 16
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
