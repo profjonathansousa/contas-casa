@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
 <link rel="icon" href="icones/icone-192.png">
-<link rel="stylesheet" href="app.css?v=18">
+<link rel="stylesheet" href="app.css?v=19">
 </head>
 <body>
 
@@ -39,6 +39,7 @@
       <button id="mes-nome" class="nome-mes" aria-label="Voltar ao mês atual">&nbsp;</button>
       <button id="mes-prox" class="seta" aria-label="Próximo mês">&rsaquo;</button>
     </div>
+    <p id="mes-previsao" class="previsao" hidden>Previsão · contas fixas e parcelas já programadas</p>
     <div class="totais">
       <div class="total"><span>previsto</span><b id="t-previsto">—</b></div>
       <div class="total pg"><span>pago</span><b id="t-pago">—</b></div>
@@ -174,7 +175,7 @@
 <div id="folha-apagar" class="folha" hidden>
   <h2>Apagar esta conta?</h2>
   <p id="ap-desc" class="ap-desc"></p>
-  <p class="ap-nota">Some para os dois, e não dá para desfazer.</p>
+  <p id="ap-nota" class="ap-nota">Some para os dois, e não dá para desfazer.</p>
   <div class="botoes">
     <button type="button" id="ap-cancelar" class="secundario">Cancelar</button>
     <button type="button" id="ap-confirmar" class="perigo">Apagar</button>
@@ -253,6 +254,6 @@
 
 <script src="vendor/supabase.js"></script>
 <script src="config.js?v=10"></script>
-<script src="app.js?v=20"></script>
+<script src="app.js?v=21"></script>
 </body>
 </html>

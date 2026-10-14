@@ -283,8 +283,18 @@ var supabase = {
         });
         return thenable(function () {
           if (nome === 'garantir_mes') {
-            return { data: [{ competencia: RESPOSTA_GARANTIR.competencia,
-                              criadas:     RESPOSTA_GARANTIR.criadas }], error: null };
+            // Como o do banco desde o sql/21: uma linha por mes, o corrente e
+            // os doze seguintes. Com .embaralhar, as linhas vem de tras para
+            // frente — para provar que o app nao depende da ordem.
+            var linhas = [];
+            for (var k = 0; k <= 12; k++) {
+              var pg = RESPOSTA_GARANTIR.competencia.split('-');
+              var dg = new Date(+pg[0], +pg[1] - 1 + k, 1);
+              linhas.push({ competencia: dg.getFullYear() + '-' + String(dg.getMonth()+1).padStart(2,'0') + '-01',
+                            criadas: k === 0 ? RESPOSTA_GARANTIR.criadas : 0 });
+            }
+            if (RESPOSTA_GARANTIR.embaralhar) linhas.reverse();
+            return { data: linhas, error: null };
           }
           if (nome === 'gerar_mes') return { data: 1, error: null };
           if (nome === 'parcelar_lancamento') {

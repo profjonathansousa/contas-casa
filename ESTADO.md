@@ -1,6 +1,7 @@
 # ESTADO — Nossas Contas
 
-Atualizado em 27/09/2026 — auditoria de retomada; bloco 16 (correções de
+Atualizado em 14/10/2026 — bloco 21 (os meses à frente). Antes disso, em
+27/09/2026 — auditoria de retomada; bloco 16 (correções de
 dados) aplicado no banco; bloco 17 (o histórico numa tela só) no ar desde
 27/09/2026; bloco 18 (os gráficos desde o início) no ar desde 27/09/2026; bloco 19
 ("parcelar" direto na conta do mês) no ar desde 27/09/2026; bloco 20 (UX do
@@ -8,6 +9,92 @@ código de pagamento) no ar desde 27/09/2026. A lista da auditoria de 27/09
 está completa.
 
 ## ESTADO ATUAL
+
+### Bloco 21 — os meses à frente (14/10/2026)
+
+**O pedido**, de Jonathan: que as contas fixas e as parceladas já apareçam
+nos meses seguintes, para olhar à frente e saber o que está programado. "É
+melhor eu excluir algo que tenha mudado no mês seguinte do que não conseguir
+fazer uma projeção." E que valesse já, sem esperar a virada do mês.
+
+**Onde estava a trava:** a decisão do bloco 11, "navegar é leitura", com só o
+mês corrente nascendo. Em 14/10 o banco tinha setembro e outubro; de novembro
+em diante, nenhuma conta. 14 fixas ativas (12 mensais, 2 parceladas — uma até
+08/2027, outra até 04/2029). Outubro tinha 7 contas digitadas à mão, que não
+são fixas e por isso não entram na previsão.
+
+**Decisões, tomadas com Jonathan antes do código:**
+
+- **Horizonte de 12 meses para tudo**, rolante. A parcelada que vai até
+  04/2029 aparece até o fim da janela e vai se revelando mês a mês. Mostrar as
+  parceladas inteiras foi descartado: os meses de 2028 teriam uma conta só e
+  um total que parece previsão e não é.
+- **Fixa desligada ou apagada sai dos meses à frente**, só das contas não
+  pagas.
+- Os meses à frente **acompanham as fixas**; sem isso, mudar o valor da
+  internet seria corrigir doze meses à mão.
+
+**O desenho** (`sql/21_meses_a_frente.sql`):
+
+- `garantir_mes()` continua sem parâmetro e faz nascer o mês corrente e os 12
+  seguintes. A única porta que grava marca passa a ser
+  `privado.marcar_meses()` (definer, sem parâmetro, horizonte fixo nela);
+  `privado.marcar_mes_corrente()` sai. Marca de mês à frente tem origem
+  `'antecipado'`. A resposta é uma linha por mês, a primeira é o corrente: o
+  app de antes deste bloco, que lê `data[0]`, continua certo.
+- **Que mês é hoje** mora em `privado.mes_corrente()`, usado pelas marcas,
+  pelo gatilho e pelo corte do histórico.
+- **O que uma fixa vira num mês** mora em `privado.lancar_fixas(casa, mês,
+  fixa?)`, o corpo de sempre do `gerar_mes()` com um filtro opcional de fixa.
+  `gerar_mes()` (o botão) só descobre a casa e delega. O gatilho não pode
+  chamar o `gerar_mes()` inteiro: traria de volta, num mês à frente, a conta
+  apagada de propósito.
+- **Gatilho em `modelo`** (`modelo_meses_a_frente`, depois de insert/update;
+  `modelo_antes_de_apagar`, antes do delete — depois do delete a chave
+  estrangeira já teria posto `modelo_id` em nulo). Só meses posteriores ao
+  corrente e já nascidos; só conta não paga. Nova ou religada: entra em todos.
+  Desligada ou apagada: sai. Valor padrão: muda onde ainda era o antigo.
+  Parcelas: acerta `parcela_n`/`parcela_de`, tira o que saiu da janela e põe
+  **só** o mês que acabou de entrar nela — mês que estava na janela e não tem
+  a conta é mês em que ela foi apagada. Tudo `security invoker`, sob a RLS.
+- `historico()` e `graficos()` param no mês corrente: previsão não é passado,
+  e somada aos gráficos viraria doze meses de "a pagar".
+
+**Na tela:** mês à frente leva no cabeçalho "Previsão · contas fixas e
+parcelas já programadas". Além dos 12 meses, a tela vazia diz até onde vai a
+previsão. O app toma por corrente o menor mês da resposta, sem depender da
+ordem. Voltar das contas fixas relê o mês só se alguma fixa mudou. Ligar,
+desligar, mudar valor, mudar parcelas, criar e apagar fixa dizem o que
+aconteceu com os próximos meses. `app.css?v=19`, `app.js?v=21`, casca `v15`.
+
+**Medido:**
+
+- Numa **réplica local** (Postgres 16, os SQLs do repositório em ordem sobre
+  um `auth` falso; as funções conferidas por md5 contra produção, todas iguais
+  — a `parcelar_lancamento()` de produção só não tem os comentários). Com
+  dados de mentira parecidos com os de produção:
+  - `sql/21_prova_meses_a_frente.sql`: **bloco 21 provado**, e o ROLLBACK
+    deixa o banco como estava. Sete controles negativos, cada um uma mutação
+    do SQL, todos vermelhos no passo certo: valor por cima do digitado,
+    horizonte de 11, histórico sem corte, gráficos sem corte, janela trazendo
+    de volta o apagado, apagar sem o gatilho de antes, desligar apagando o
+    pago.
+  - **Dois aparelhos ao mesmo tempo**, duas sessões de verdade: a segunda
+    esperou ~1,5 s a transação da primeira, criou 0, devolveu o mês corrente
+    na primeira linha; nenhuma conta duplicada; 13 marcas.
+  - **Virada do mês**, com o relógio do banco adiantado: o mês que já era
+    previsão não gera de novo; nasce o 13º; a parcela longa segue a conta
+    (20/36); valor novo só alcança dali em diante.
+- Bancada **358 / 4 / 27 / 49**, 0 falhas. Sete controles negativos no
+  `app.js`, todos vermelhos: ler a primeira linha como antes, sem marca de
+  previsão, marca pelo relógio do aparelho, voltar nunca reler, voltar sempre
+  reler, sem o texto do horizonte, e prometer "próximos meses" ao mudar o
+  valor de uma fixa desligada.
+
+**Em produção:** SQL **pendente de aplicação** (a primeira tentativa, em
+14/10, foi cancelada antes de chegar ao banco; nada mudou lá). O app só vai
+para a `main` depois do SQL: sem ele, a marca de previsão apareceria sobre
+meses vazios.
 
 ### Auditoria de 27/09/2026 — o que mudou de entendimento
 
@@ -199,7 +286,7 @@ está completa.
   aprovado e o histórico real importado em tabelas próprias.
 - Bloco **12** (gráficos) **implementado e provado no banco**:
   `sql/12_graficos.sql` aplicado e `sql/12_prova_graficos.sql` aprovado.
-- Bancada verde em **337 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
+- Bancada verde em **358 / 4 / 27 / 49** com **0 falhas**; o `rodar.sh`
   confere o placar e
   derruba o CI se alguma medida falhar, se o motor morrer ou se o número mudar
   sem atualização explícita.

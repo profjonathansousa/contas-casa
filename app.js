@@ -14,6 +14,7 @@ var el = {
   login: $('#tela-login'), formLogin: $('#form-login'), email: $('#in-email'),
   senha: $('#in-senha'), btnEntrar: $('#btn-entrar'), erroLogin: $('#erro-login'),
   mes: $('#tela-mes'), mesAnt: $('#mes-ant'), mesProx: $('#mes-prox'), mesNome: $('#mes-nome'),
+  mesPrevisao: $('#mes-previsao'),
   tPrevisto: $('#t-previsto'), tPago: $('#t-pago'), tApagar: $('#t-apagar'), tAberto: $('#t-aberto'),
   lista: $('#lista'), btnAdd: $('#btn-add'), btnSair: $('#btn-sair'),
   fundoAdd: $('#fundo-add'), folhaAdd: $('#folha-add'), adDesc: $('#ad-desc'),
@@ -21,7 +22,8 @@ var el = {
   campoDia: $('#campo-dia'), rotuloAdValor: $('#rotulo-ad-valor'),
   erroAdd: $('#erro-add'), aviso: $('#aviso'),
   fundoApagar: $('#fundo-apagar'), folhaApagar: $('#folha-apagar'),
-  apDesc: $('#ap-desc'), apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar'),
+  apDesc: $('#ap-desc'), apNota: $('#ap-nota'),
+  apCancelar: $('#ap-cancelar'), apConfirmar: $('#ap-confirmar'),
   adTitulo: $('#ad-titulo'), btnGerar: $('#btn-gerar'), btnFixas: $('#btn-fixas'),
   btnGraficos: $('#btn-graficos'), graficos: $('#tela-graficos'),
   grafLista: $('#graf-lista'), grafVoltar: $('#graf-voltar'),
@@ -66,6 +68,11 @@ var eu = null;        // { id, casa_id, nome }
 var nomes = {};       // id do perfil -> primeiro nome
 var comp = mesDeHoje();
 var mesGarantido = null;   // a competência que o BANCO disse ser a corrente
+// Quantos meses à frente do corrente o banco já faz nascer (o 12 de
+// privado.marcar_meses(), no sql/21). Aqui só serve para dizer até onde vai a
+// previsão quando a pessoa navega além dela.
+var MESES_A_FRENTE = 12;
+var fixasMudaram = false;  // mexeu numa fixa: os meses à frente mudaram no banco
 var itens = [];
 var canal = null;
 var editando = false;
@@ -103,6 +110,8 @@ function competenciaDe(ano, mes0) {
 }
 function mesDeHoje() { var h = new Date(); return competenciaDe(h.getFullYear(), h.getMonth()); }
 function andarMes(c, n) { var p = c.split('-'); return competenciaDe(+p[0], +p[1] - 1 + n); }
+// O mês corrente é o do banco, quando ele já respondeu; até lá, o do aparelho.
+function mesCorrente() { return mesGarantido || mesDeHoje(); }
 function comoData(c) { var p = c.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
 function ddmm(iso) { var p = iso.split('-'); return p[2] + '/' + p[1]; }
 function hhmm(ts) {
@@ -499,7 +508,9 @@ async function garantirMesCorrente() {
   try {
     var g = await db.rpc('garantir_mes');
     if (g.error || !g.data || !g.data[0]) return null;
-    mesGarantido = g.data[0].competencia;
+    // Volta uma linha por mês — o corrente e os doze seguintes, que nascem
+    // juntos (sql/21). O corrente é o menor; não depender da ordem das linhas.
+    mesGarantido = g.data.map(function (x) { return x.competencia; }).sort()[0];
     return mesGarantido;
   } catch (e) {
     return null;   // sem rede: o mês segue como está, e o botão cobre
@@ -566,6 +577,11 @@ function desenhar() {
 
   var rotulo = fmtMes.format(comoData(comp));            // "agosto de 2026"
   el.mesNome.textContent = rotulo.charAt(0).toUpperCase() + rotulo.slice(1);
+  // Mês à frente é previsão: o que as fixas e as parcelas já programaram. A
+  // marca está no cabeçalho, que fica fixo, para não ser confundido com o mês
+  // que está correndo.
+  var previsao = comp > mesCorrente();
+  el.mesPrevisao.hidden = !previsao;
 
   var previsto = 0, pago = 0, apagar = 0, semValor = 0;
   itens.forEach(function (i) {
@@ -594,7 +610,10 @@ function desenhar() {
   if (itens.length === 0) {
     var vazio = document.createElement('p');
     vazio.className = 'vazio-mes';
-    vazio.textContent = 'Nenhuma conta neste mês. Toque no + para adicionar.';
+    var limite = andarMes(mesCorrente(), MESES_A_FRENTE);
+    vazio.textContent = comp > limite
+      ? 'A previsão vai até ' + fmtMes.format(comoData(limite)) + '. Toque no + para adicionar.'
+      : 'Nenhuma conta neste mês. Toque no + para adicionar.';
     el.lista.appendChild(vazio);
   } else {
     var diaAtual = null;
@@ -1169,6 +1188,9 @@ function pedirApagar(it, tipo) {
   paraApagar = it;
   tipoApagar = tipo || 'lancamento';
   el.apDesc.textContent = it.descricao;
+  el.apNota.textContent = tipoApagar === 'modelo'
+    ? 'Sai também dos próximos meses — o que já foi pago fica. Não dá para desfazer.'
+    : 'Some para os dois, e não dá para desfazer.';
   el.fundoApagar.hidden = false;
   el.folhaApagar.hidden = false;
 }
@@ -1191,6 +1213,7 @@ el.apConfirmar.addEventListener('click', async function () {
     desenharFixas();
     var rm = await db.from('modelo').delete().eq('id', it.id);
     if (rm.error) { modelos = guardaM; desenharFixas(); aviso('Não deu para apagar. ' + rm.error.message); }
+    else fixasMudaram = true;
     return;
   }
 
@@ -1271,9 +1294,13 @@ el.btnFixas.addEventListener('click', async function () {
   await carregarModelos();
   desenharFixas();
 });
+// Mexer numa fixa muda os meses à frente no banco (sql/21). Se a pessoa
+// estava olhando um deles, a tela tem que reler; se não mexeu em nada, não há
+// por que ir ao banco.
 el.fxVoltar.addEventListener('click', function () {
   mostrarTela('mes');
-  desenhar();
+  if (fixasMudaram) { fixasMudaram = false; carregarMes(); }
+  else desenhar();
 });
 
 // Os meses do app e os do arquivo antigo numa lista só. Quem decide onde o
@@ -1771,7 +1798,11 @@ el.folhaParcelas.addEventListener('submit', async function (ev) {
     m.parcelas_total = antesT; m.parcela_1 = antesM;
     desenharFixas();
     aviso('Não deu para salvar. ' + r.error.message);
+    return;
   }
+  fixasMudaram = true;
+  // fixa desligada não está em mês nenhum à frente: não há o que dizer deles
+  if (m.ativo) aviso('Salvo. Os próximos meses já seguem estas parcelas.');
 });
 
 async function alternarAtivo(m) {
@@ -1779,7 +1810,10 @@ async function alternarAtivo(m) {
   m.ativo = !m.ativo;
   desenharFixas();
   var r = await db.from('modelo').update({ ativo: m.ativo }).eq('id', m.id);
-  if (r.error) { m.ativo = antes; desenharFixas(); aviso('Não deu para salvar. ' + r.error.message); }
+  if (r.error) { m.ativo = antes; desenharFixas(); aviso('Não deu para salvar. ' + r.error.message); return; }
+  fixasMudaram = true;
+  aviso(m.ativo ? 'Ligada. Já aparece nos próximos meses.'
+                : 'Desligada. Saiu dos próximos meses; o que já foi pago fica.');
 }
 
 function editarPadrao(m, botao) {
@@ -1802,7 +1836,9 @@ function editarPadrao(m, botao) {
     m.valor_padrao = n;
     desenharFixas();
     var r = await db.from('modelo').update({ valor_padrao: n }).eq('id', m.id);
-    if (r.error) { m.valor_padrao = antes; desenharFixas(); aviso('Não deu para salvar. ' + r.error.message); }
+    if (r.error) { m.valor_padrao = antes; desenharFixas(); aviso('Não deu para salvar. ' + r.error.message); return; }
+    fixasMudaram = true;
+    if (m.ativo) aviso('Valor salvo. Vale também nos próximos meses.');
   }
   inp.addEventListener('blur', salvar);
   inp.addEventListener('keydown', function (ev) {
@@ -2011,6 +2047,8 @@ el.folhaAdd.addEventListener('submit', async function (ev) {
       return a.dia_vencimento - b.dia_vencimento || a.descricao.localeCompare(b.descricao, 'pt-BR');
     });
     desenharFixas();
+    fixasMudaram = true;
+    aviso('Conta fixa criada. Já aparece nos próximos meses.');
     return;
   }
 

@@ -187,6 +187,7 @@ medir('meio segundo AINDA nao abre', q('#folha-apagar').hidden, true);
 avancarTempo(700);
 medir('segurar 0,7s abriu a confirmacao', q('#folha-apagar').hidden, false);
 medir('diz qual conta', q('#ap-desc')._txt, descD);
+medir('nota da conta do mes', q('#ap-nota')._txt, 'Some para os dois, e não dá para desfazer.');
 
 // o clique que o navegador manda depois do toque longo nao pode marcar pago
 var upAntes = LOG.updates.length;
@@ -235,6 +236,7 @@ medir('campos no update', LOG.updates[upA].campos, ['ativo']);
 medir('valor enviado', LOG.updates[upA].valores.ativo, true);
 medir('tabela', LOG.updates[upA].tabela, 'modelo');
 medir('acendeu na tela', fixasDesenhadas()[2].className.indexOf('desligado') > 0, false);
+medir('diz que entra nos proximos meses', q('#aviso')._txt, 'Ligada. Já aparece nos próximos meses.');
 
 print('\n  -- editar o valor padrao --');
 var luzFixa = fixasDesenhadas()[1];              // Luz, sem valor
@@ -247,6 +249,7 @@ campoF.disparar('blur');
 esperar();
 medir('campos no update', LOG.updates[upB].campos, ['valor_padrao']);
 medir('numero interpretado', LOG.updates[upB].valores.valor_padrao, 210.90);
+medir('diz que vale nos proximos meses', q('#aviso')._txt, 'Valor salvo. Vale também nos próximos meses.');
 
 print('\n  -- segurar apaga a fixa (nao o lancamento) --');
 var delA = LOG.deletes.length;
@@ -254,6 +257,8 @@ fixasDesenhadas()[3].disparar('pointerdown');
 avancarTempo(700);
 medir('pediu confirmacao', q('#folha-apagar').hidden, false);
 medir('diz qual', q('#ap-desc')._txt, 'Condominio');
+medir('avisa que sai dos proximos meses', q('#ap-nota')._txt,
+      'Sai também dos próximos meses — o que já foi pago fica. Não dá para desfazer.');
 q('#ap-confirmar').disparar('click');
 esperar();
 medir('apagou na tabela certa', LOG.deletes[delA].tabela, 'modelo');
@@ -272,6 +277,7 @@ medir('inserts feitos', LOG.inserts.length - insA, 1);
 medir('virou modelo, com valor_padrao', Object.keys(LOG.inserts[insA]).sort(),
       ['casa_id','descricao','dia_vencimento','valor_padrao']);
 medir('voltou a ter 4 fixas', fixasDesenhadas().length, 4);
+medir('diz que ja aparece nos proximos meses', q('#aviso')._txt, 'Conta fixa criada. Já aparece nos próximos meses.');
 
 print('\n  -- voltar e gerar o mes --');
 q('#fx-voltar').disparar('click');
@@ -1141,6 +1147,80 @@ medir('explicacao da fixa', [q('#pc-nota-conta').hidden, q('#pc-nota-fixa').hidd
 medir('sem leitura de conta', q('#pc-leitura').hidden, true);
 q('#pc-cancelar').disparar('click');
 voltarDasFixas();
+
+print('\n== 25. os meses a frente ==');
+print('  (o banco faz nascer o mes corrente e os doze seguintes, e os meses a frente');
+print('   acompanham as fixas: sql/21, provado no banco pelo sql/21_prova. A bancada');
+print('   mede o lado do cliente: que mes ele toma por corrente, a marca de');
+print('   previsao, ate onde ela vai, e quando ele rele o mes depois de uma fixa.)');
+function lancSelects() { return LOG.selects.filter(function (x) { return x.tabela === 'lancamento'; }).length; }
+function vazioDaLista() { return q('#lista').filhos[0] && q('#lista').filhos[0]._txt; }
+var MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto',
+                'setembro','outubro','novembro','dezembro'];
+var p21 = MESHOJE.split('-'), lim21 = new Date(+p21[0], +p21[1] - 1 + 12, 1);
+var LIMITE21 = MESES_PT[lim21.getMonth()] + ' de ' + lim21.getFullYear();
+
+print('\n  -- treze meses na resposta; o corrente e o menor, em qualquer ordem --');
+print('  (o app de antes lia a primeira linha; de tras para frente, abriria daqui a um ano)');
+RESPOSTA_GARANTIR = { competencia: MESHOJE, criadas: 0, embaralhar: true };
+entrar();
+medir('abriu no mes corrente', mesNaTela(), MESHOJE);
+delete RESPOSTA_GARANTIR.embaralhar;
+
+print('\n  -- a marca de previsao: so nos meses a frente --');
+medir('mes corrente sem marca', q('#mes-previsao').hidden, true);
+q('#mes-prox').disparar('click'); esperar();
+medir('mes que vem com marca', q('#mes-previsao').hidden, false);
+q('#mes-ant').disparar('click'); esperar();
+q('#mes-ant').disparar('click'); esperar();
+medir('mes passado sem marca', q('#mes-previsao').hidden, true);
+q('#mes-prox').disparar('click'); esperar();
+medir('de volta ao corrente, sem marca', q('#mes-previsao').hidden, true);
+print('  (quem diz qual e o corrente e o banco: se para ele o mes ja virou, nao e previsao)');
+RESPOSTA_GARANTIR = { competencia: MESPROX19, criadas: 0 };
+entrar();
+medir('o mes do banco, sem marca', [mesNaTela(), q('#mes-previsao').hidden], [MESPROX19, true]);
+RESPOSTA_GARANTIR = { competencia: MESHOJE, criadas: 0 };
+entrar();
+
+print('\n  -- alem do horizonte, a tela vazia diz ate onde vai a previsao --');
+var guardaBanco21 = BANCO.slice();
+BANCO.length = 0;
+for (var i21 = 0; i21 < 12; i21++) { q('#mes-prox').disparar('click'); esperar(); }
+medir('doze a frente: vazio comum', vazioDaLista(), 'Nenhuma conta neste mês. Toque no + para adicionar.');
+q('#mes-prox').disparar('click'); esperar();
+medir('treze a frente: diz ate onde vai', vazioDaLista(),
+      'A previsão vai até ' + LIMITE21 + '. Toque no + para adicionar.');
+guardaBanco21.forEach(function (x) { BANCO.push(x); });
+q('#mes-nome').disparar('click'); esperar();
+medir('tocar no nome volta ao corrente', mesNaTela(), MESHOJE);
+
+print('\n  -- mexer numa fixa muda os meses a frente: voltar rele o mes --');
+q('#mes-prox').disparar('click'); esperar();      // olhando o mes que vem
+abrirFixas();
+var sel21 = lancSelects();
+fixaPorDesc('Aluguel').disparar('click'); esperar();
+medir('diz o que aconteceu', q('#aviso')._txt, 'Desligada. Saiu dos próximos meses; o que já foi pago fica.');
+voltarDasFixas();
+medir('releu o mes', lancSelects() - sel21, 1);
+medir('o mes que estava na tela', mesNaTela(), MESPROX19);
+print('  (CONTROLE: sem mexer em nada, voltar nao vai ao banco)');
+abrirFixas();
+var sel21b = lancSelects();
+voltarDasFixas();
+medir('nao releu', lancSelects() - sel21b, 0);
+print('  (fixa desligada nao esta em mes nenhum a frente: mudar o valor dela nao promete nada)');
+abrirFixas();
+q('#aviso')._txt = '';
+medir('a Escola esta desligada', fixaPorDesc('Escola').className.indexOf('desligado') > 0, true);
+fixaPorDesc('Escola').filhos[2].disparar('click');
+fixaPorDesc('Escola').filhos[2].value = '45,00';
+fixaPorDesc('Escola').filhos[2].disparar('blur');
+esperar();
+medir('salvou o valor', LOG.updates[LOG.updates.length - 1].valores, { valor_padrao: 45 });
+medir('sem aviso de proximos meses', q('#aviso')._txt, '');
+voltarDasFixas();
+q('#mes-ant').disparar('click'); esperar();
 
 print('\n  -- logout limpa o cache de receitas --');
 var chaveReceitas = 'receitas:' + CASA + ':' + MESHOJE;

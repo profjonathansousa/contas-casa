@@ -52,7 +52,9 @@ CONTAS_CASA/
 │   ├── 18_graficos_desde_o_inicio.sql  gráficos com o arquivo antigo
 │   ├── 18_prova_graficos.sql      prova do bloco 18 (substitui a do 12)
 │   ├── 19_parcelar_lancamento.sql  "parcelar" direto na conta do mês
-│   └── 19_prova_parcelar.sql      prova do bloco 19
+│   ├── 19_prova_parcelar.sql      prova do bloco 19
+│   ├── 21_meses_a_frente.sql      os 12 meses seguintes nascem e acompanham as fixas
+│   └── 21_prova_meses_a_frente.sql  prova do bloco 21
 ├── icones/                    ícones do PWA (gerados, 4 PNGs)
 ├── avisos/                    envio do resumo diário (roda só no Actions)
 │                              package.json + package-lock.json, instalado com npm ci
@@ -76,18 +78,33 @@ o caso da conta de mercado, cujo valor só se sabe depois.
 O botão "Transformar as contas do mês em fixas" cria as fixas de uma vez a
 partir do mês que está na tela. Depois é só desligar as que não se repetem.
 
-**O mês corrente nasce sozinho.** Ao abrir o app, o banco confere se aquela
-competência já foi inicializada nesta casa e, se não foi, traz as contas fixas
-— uma vez, e só do mês corrente, decidido pelo relógio de São Paulo no próprio
-banco. **Navegar entre meses é leitura**: voltar para janeiro não cria janeiro.
+**O mês corrente e os 12 seguintes nascem sozinhos.** Ao abrir o app, o banco
+confere quais competências já foram inicializadas nesta casa — a do mês
+corrente e as dos doze meses seguintes, decididas pelo relógio de São Paulo no
+próprio banco — e traz as contas fixas e as parcelas para cada uma que ainda
+não nasceu, uma vez. Avançar para os próximos meses mostra o que já está
+programado: é **previsão**, e o cabeçalho diz isso. A janela anda sozinha: na
+virada do mês, nasce mais um no fim dela. **Navegar entre meses continua sendo
+leitura**: voltar para janeiro não cria janeiro, e ir além dos doze meses não
+cria nada — a tela diz até onde vai a previsão.
+
+**Os meses à frente acompanham as contas fixas.** Mexer numa fixa vale para os
+meses posteriores ao corrente, e só para as contas ainda não pagas: fixa nova
+ou religada entra neles; desligada ou apagada sai; valor padrão novo vale onde
+a conta ainda tinha o valor antigo — onde você digitou outro, o seu manda;
+parcelas novas acertam o "5/12" e tiram ou põem o mês que saiu ou entrou na
+janela. "Parcelar" e "Transformar as contas do mês em fixas" passam pelo mesmo
+caminho. O mês corrente não muda sozinho: nele vale o botão.
 
 **O botão continua.** Ele mudou de papel: automático é *o mês nasce*; o botão
 "Trazer N contas fixas" é *traga o que falta*, para a conta fixa cadastrada
-depois que o mês já nasceu. Aparece sozinho quando há o que trazer.
+depois que o mês corrente já nasceu, ou para trazer de volta a que você apagou
+num mês à frente. Aparece sozinho quando há o que trazer.
 
 **Apagar vale.** Uma conta apagada não volta ao reabrir o app, ao voltar do
-segundo plano nem ao navegar até o mês. Só volta se você tocar no botão — que é
-o pedido explícito de trazê-la de volta.
+segundo plano nem ao navegar até o mês — nem quando o mês à frente em que você
+a apagou chega. Só volta se você tocar no botão — que é o pedido explícito de
+trazê-la de volta.
 
 Gerar o mês duas vezes não duplica nada: a comparação é por descrição, então
 conta já digitada na mão também não vem repetida. E um modelo produz no máximo
@@ -171,7 +188,7 @@ iPhone, porque o app instalado não enxerga a sessão do Safari.
 
 Roda o `app.js` e o `sw.js` **reais** dentro do `jsc` (que já vem no macOS) ou,
  onde não há `jsc`, dentro do `node`, com DOM, relógio e Supabase falsos. Tem que
-fechar em 337 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
+fechar em 358 / 4 / 27 / 49 medidas e zero falhas — e o próprio `rodar.sh` sai
 com erro quando não fecha. O CI roda a mesma bancada a cada push, em workflow
 separado do Web Push, sem tocar no banco e sem Secret nenhum.
 
@@ -184,12 +201,13 @@ separado do Web Push, sem tocar no banco e sem Secret nenhum.
 por pessoa, todas `default true`).
 
 **mes_gerado** — `casa_id`, `competencia`, `gerado_em`, `origem`
-(`'automatico'` ou `'backfill'`), chave primária `(casa_id, competencia)`. Uma
+(`'automatico'`, `'backfill'` ou `'antecipado'`, este para o mês que nasceu
+quando ainda estava à frente), chave primária `(casa_id, competencia)`. Uma
 linha quer dizer "esta competência desta casa já foi inicializada". É a trava
 que resolve dois aparelhos abrindo o app ao mesmo tempo, e é o que torna
 durável apagar uma conta. **O cliente não escreve nela por caminho nenhum**: só
-tem `SELECT`. A única porta é `privado.marcar_mes_corrente()`, `security
-definer` e sem parâmetro, num schema que o PostgREST não publica — casa e mês
+tem `SELECT`. A única porta é `privado.marcar_meses()`, `security
+definer` e sem parâmetro, num schema que o PostgREST não publica — casa e meses
 ela calcula sozinha. Sem isso, um POST à mão marcaria o mês como nascido sem
 gerar nada, e as contas daquele mês nunca viriam. O `'backfill'` só entra pela
 migration, que roda como `postgres`.
@@ -259,7 +277,11 @@ Os blocos **1 a 15** estão concluídos, e o **Bloco 12** também. O `sql/11` fo
 07/09/2026 e a prova SQL passou. O `sql/14` também foi aplicado e provado em
 produção. O `sql/15` foi aplicado e provado, e o histórico legado real foi
 importado. O `sql/12` de gráficos também foi aplicado e provado. A bancada
-fecha em `337 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+fecha em `358 / 4 / 27 / 49` e o CI roda a mesma bancada a cada push.
+
+- Bloco **21** (os meses à frente): o mês corrente e os doze seguintes nascem
+  juntos, com as fixas e as parcelas, e acompanham as fixas dali em diante.
+  Histórico e gráficos param no mês corrente. Ver `ESTADO.md`.
 
 - Bloco **8** (código de pagamento), **9** (parcelas) e **10** (troca e
   recuperação de senha) estão implementados e no ar.
