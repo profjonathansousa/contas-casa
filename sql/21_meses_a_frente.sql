@@ -323,13 +323,11 @@ end $$;
 
 revoke all on function public.tg_modelo_meses_a_frente() from public, anon, authenticated;
 
-drop trigger if exists modelo_meses_a_frente on public.modelo;
-create trigger modelo_meses_a_frente
+create or replace trigger modelo_meses_a_frente
   after insert or update on public.modelo
   for each row execute function public.tg_modelo_meses_a_frente();
 
-drop trigger if exists modelo_antes_de_apagar on public.modelo;
-create trigger modelo_antes_de_apagar
+create or replace trigger modelo_antes_de_apagar
   before delete on public.modelo
   for each row execute function public.tg_modelo_meses_a_frente();
 

@@ -91,10 +91,33 @@ aconteceu com os próximos meses. `app.css?v=19`, `app.js?v=21`, casca `v15`.
   reler, sem o texto do horizonte, e prometer "próximos meses" ao mudar o
   valor de uma fixa desligada.
 
-**Em produção:** SQL **pendente de aplicação** (a primeira tentativa, em
-14/10, foi cancelada antes de chegar ao banco; nada mudou lá). O app só vai
-para a `main` depois do SQL: sem ele, a marca de previsão apareceria sobre
-meses vazios.
+**Em produção, 14/10/2026:**
+
+- **SQL aplicado em quatro partes** pelo conector do Supabase (o arquivo
+  inteiro, de uma vez, foi cancelado e depois estourou o tempo esperando
+  confirmação dos comandos destrutivos): `21a` mês corrente; `21b` fixas,
+  gatilho e corte (nada destrutivo, o gatilho só age em mês à frente já
+  nascido, e não havia nenhum); `21c` a regra de `origem`; `21d` marcas e
+  `garantir_mes()`. As 8 funções e os 2 gatilhos conferidos por md5 contra a
+  réplica onde a prova passou: **todos iguais**. `anon` sem `EXECUTE` nas
+  quatro funções novas ou trocadas.
+- **`privado.marcar_mes_corrente()` ficou no banco**: o `drop` foi cancelado e
+  não foi insistido. Não tem uso — ninguém a chama — e o PostgREST não publica
+  o schema `privado`. Para tirar, rodar no SQL Editor:
+  `drop function if exists privado.marcar_mes_corrente();`
+- **Prova em produção, como morador e desfeita no fim** (a prova termina num
+  erro proposital, que desfaz a transação inteira): os passos que só leem e
+  inserem — 0, 1, 2, 3, 10, 11, 12, 13 e 14 — passaram. Os que apagam ou
+  alteram (4 a 9) também esbarravam na confirmação; estão provados na réplica
+  de funções idênticas. Nenhuma sobra de prova no banco, conferido depois.
+- **Efeito imediato:** `garantir_mes()` rodado como morador, o mesmo que o app
+  faz ao abrir. Nasceram nov/2026 a out/2027, origem `'antecipado'`: **154
+  contas** — 13 por mês até ago/2027, 12 em set e out/2027 (a parcelada que
+  acaba em 08/2027). Em todo mês à frente, contas = fixas ativas que valem
+  nele. Eram 13 fixas ativas na hora, não as 14 da auditoria da manhã: uma
+  mensal foi desligada no meio do dia. Outubro intocado (21 contas).
+- App na `main` depois do SQL, nunca antes: sem o SQL, a marca de previsão
+  apareceria sobre meses vazios.
 
 ### Auditoria de 27/09/2026 — o que mudou de entendimento
 
